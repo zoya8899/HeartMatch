@@ -1,0 +1,195 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'zoyakhokhar001@gmail.com' ||
+        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid))
+      );
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        incoming().uid == request.auth.uid &&
+        incoming().role == 'user' &&
+        incoming().ageVerified is bool;
+      allow update: if (isOwner(userId) && incoming().uid == existing().uid && incoming().role == existing().role) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Profiles collection (18+ public discoverable adult dating profiles)
+    match /profiles/{userId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().age is number && incoming().age >= 18 &&
+        incoming().name is string && incoming().name.size() >= 2 && incoming().name.size() <= 50 &&
+        (!('verified' in incoming()) || incoming().verified == false) &&
+        (!('verificationStatus' in incoming()) || incoming().verificationStatus == 'unverified' || incoming().verificationStatus == 'pending');
+      allow update: if (isOwner(userId) &&
+        incoming().userId == existing().userId &&
+        incoming().age is number && incoming().age >= 18 &&
+        (isAdmin() || (
+          incoming().verified == existing().verified &&
+          (!('verificationStatus' in incoming()) || incoming().verificationStatus == existing().verificationStatus || (existing().verificationStatus in ['unverified', 'failed'] && incoming().verificationStatus == 'pending'))
+        ))) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Preferences collection
+    match /preferences/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && isValidId(userId) && incoming().userId == request.auth.uid;
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Discovery Preferences collection
+    match /discoveryPreferences/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && isValidId(userId) && incoming().userId == request.auth.uid;
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Profile Activity collection (engagement metrics)
+    match /profileActivity/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Likes collection
+    match /likes/{likeId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.targetUserId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.targetUserId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidId(incoming().targetUserId) && incoming().userId != incoming().targetUserId;
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // Matches collection
+    match /matches/{matchId} {
+      allow get: if isSignedIn() && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (incoming().user1Id == request.auth.uid || incoming().user2Id == request.auth.uid) && incoming().user1Id != incoming().user2Id;
+      allow update: if isSignedIn() && (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid || isAdmin());
+
+      // Messages subcollection inside match
+      match /messages/{messageId} {
+        function isParticipant() {
+          return get(/databases/$(database)/documents/matches/$(matchId)).data.user1Id == request.auth.uid ||
+                 get(/databases/$(database)/documents/matches/$(matchId)).data.user2Id == request.auth.uid;
+        }
+
+        allow read: if isSignedIn() && (isParticipant() || isAdmin());
+        allow create: if isSignedIn() && isParticipant() &&
+          incoming().senderId == request.auth.uid &&
+          incoming().text is string && incoming().text.size() <= 2000 &&
+          get(/databases/$(database)/documents/matches/$(matchId)).data.status == 'active';
+        allow update: if isSignedIn() && isParticipant();
+        allow delete: if isSignedIn() && (existing().senderId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // Subscriptions collection
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // Payments collection
+    match /payments/{paymentId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Products collection (pricing catalog)
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Reports collection (Safety & Moderation)
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && incoming().reporterId == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.reporterId == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Appeals collection (Suspended account appeal flow)
+    match /appeals/{appealId} {
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // Blocks collection
+    match /blocks/{blockId} {
+      allow get: if isSignedIn() && (resource.data.blockerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.blockerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().blockerId == request.auth.uid && isValidId(incoming().blockedUserId) && incoming().blockerId != incoming().blockedUserId;
+      allow delete: if isSignedIn() && (existing().blockerId == request.auth.uid || isAdmin());
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // Boosts collection
+    match /boosts/{boostId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
+    }
+
+    // Verification collection (18+ identity review queue)
+    match /verification/{verificationId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && incoming().status == 'pending' && incoming().ageConfirmed == true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Admin users collection
+    match /adminUsers/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

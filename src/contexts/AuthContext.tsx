@@ -1,0 +1,565 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import {
+  User as FirebaseUser,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  sendPasswordResetEmail,
+  deleteUser,
+  sendEmailVerification,
+} from 'firebase/auth';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { auth, db } from '../firebase/config';
+import { handleFirestoreError, OperationType } from '../firebase/errors';
+import {
+  UserAccount,
+  UserProfile,
+  UserPreference,
+  SubscriptionRecord,
+  SubscriptionPlanId,
+} from '../types';
+
+interface AuthContextType {
+  currentUser: FirebaseUser | null;
+  userAccount: UserAccount | null;
+  userProfile: UserProfile | null;
+  userPreference: UserPreference | null;
+  subscription: SubscriptionRecord | null;
+  isAdmin: boolean;
+  loading: boolean;
+  superLikesCount: number;
+  boostsCount: number;
+  rewindsCount: number;
+  loginWithEmail: (email: string, pass: string) => Promise<void>;
+  signupWithEmail: (email: string, pass: string, name: string, age: number, gender: UserProfile['gender'], interestedIn: UserProfile['interestedIn']) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
+  confirmEmailVerified: () => Promise<void>;
+  updateProfileData: (data: Partial<UserProfile>) => Promise<void>;
+  updatePreferenceData: (data: Partial<UserPreference>) => Promise<void>;
+  submitAgeVerification: (docType: string, idUrl?: string, selfieUrl?: string) => Promise<void>;
+  activateSubscription: (planId: SubscriptionPlanId, price: number) => Promise<void>;
+  useConsumable: (type: 'superlike' | 'boost' | 'rewind') => boolean;
+  addConsumable: (type: 'superlike' | 'boost' | 'spotlight' | 'rewind', amount: number) => void;
+  deleteAccount: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Admin email configured for runtime
+const BOOTSTRAP_ADMIN_EMAIL = 'zoyakhokhar001@gmail.com';
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userAccount, setUserAccount] = useState<UserAccount | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userPreference, setUserPreference] = useState<UserPreference | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Consumables state
+  const [superLikesCount, setSuperLikesCount] = useState<number>(3);
+  const [boostsCount, setBoostsCount] = useState<number>(1);
+  const [rewindsCount, setRewindsCount] = useState<number>(5);
+
+  const fetchUserData = async (user: FirebaseUser) => {
+    try {
+      const emailMatchesAdmin = user.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
+
+      // Check admin status
+      let hasAdminDoc = false;
+      try {
+        const adminDoc = await getDoc(doc(db, 'adminUsers', user.uid));
+        hasAdminDoc = adminDoc.exists();
+      } catch {
+        // Admin collection may not have doc yet; email check remains authoritative
+      }
+      setIsAdmin(emailMatchesAdmin || hasAdminDoc);
+
+      // Fetch User Account
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        setUserAccount(userSnap.data() as UserAccount);
+      } else {
+        // Initialize account record
+        const newAccount: UserAccount = {
+          uid: user.uid,
+          email: user.email || '',
+          role: emailMatchesAdmin ? 'admin' : 'user',
+          ageVerified: false,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          lastSeen: new Date().toISOString(),
+        };
+        await setDoc(userRef, newAccount);
+        setUserAccount(newAccount);
+      }
+
+      // Fetch Profile
+      const profileRef = doc(db, 'profiles', user.uid);
+      const profileSnap = await getDoc(profileRef);
+      if (profileSnap.exists()) {
+        setUserProfile(profileSnap.data() as UserProfile);
+      }
+
+      // Fetch Preferences
+      const prefRef = doc(db, 'preferences', user.uid);
+      const prefSnap = await getDoc(prefRef);
+      if (prefSnap.exists()) {
+        setUserPreference(prefSnap.data() as UserPreference);
+      } else {
+        const defaultPref: UserPreference = {
+          userId: user.uid,
+          minAge: 21,
+          maxAge: 40,
+          maxDistanceKm: 50,
+          interestedIn: 'everyone',
+          verifiedOnly: false,
+          updatedAt: new Date().toISOString(),
+        };
+        try {
+          await setDoc(prefRef, defaultPref);
+          setUserPreference(defaultPref);
+        } catch (e) {
+          console.warn('Preferences initialization note:', e);
+        }
+      }
+
+      // Fetch Subscription
+      try {
+        const subRef = doc(db, 'subscriptions', user.uid);
+        const subSnap = await getDoc(subRef);
+        if (subSnap.exists()) {
+          const subData = subSnap.data() as SubscriptionRecord;
+          if (new Date(subData.expiresAt).getTime() > Date.now()) {
+            setSubscription(subData);
+          } else {
+            setSubscription({ ...subData, status: 'expired' });
+          }
+        }
+      } catch (err) {
+        console.warn('Subscription fetch:', err);
+      }
+    } catch (err) {
+      console.error('Error fetching user data from Firestore:', err);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        await fetchUserData(user);
+      } else {
+        setUserAccount(null);
+        setUserProfile(null);
+        setUserPreference(null);
+        setSubscription(null);
+        setIsAdmin(false);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const loginWithEmail = async (email: string, pass: string) => {
+    try {
+      const res = await signInWithEmailAndPassword(auth, email, pass);
+      await fetchUserData(res.user);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      throw new Error(err.message || 'Failed to sign in. Please verify your credentials.');
+    }
+  };
+
+  const signupWithEmail = async (
+    email: string,
+    pass: string,
+    name: string,
+    age: number,
+    gender: UserProfile['gender'],
+    interestedIn: UserProfile['interestedIn']
+  ) => {
+    if (age < 18) {
+      throw new Error('HeartMatch is strictly for adults aged 18 and older.');
+    }
+
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      const uid = cred.user.uid;
+
+      // Send email verification
+      try {
+        await sendEmailVerification(cred.user);
+      } catch (e) {
+        console.warn('Verification email note:', e);
+      }
+
+      const isUserAdmin = email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
+
+      // Create User doc
+      const newAccount: UserAccount = {
+        uid,
+        email,
+        role: isUserAdmin ? 'admin' : 'user',
+        ageVerified: true, // initial self-attested 18+ declaration
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'users', uid), newAccount);
+
+      // Create Profile doc
+      const newProfile: UserProfile = {
+        userId: uid,
+        name,
+        age,
+        gender,
+        interestedIn,
+        city: 'New York',
+        country: 'United States',
+        bio: `Hello! I'm ${name}. Passionate about exploring new places, meaningful conversations, and building authentic connections.`,
+        photos: [
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'
+        ],
+        interests: ['Travel', 'Specialty Coffee', 'Music', 'Fitness'],
+        hobbies: ['Weekend Roadtrips', 'Reading', 'Photography'],
+        profession: 'Professional',
+        education: 'University Graduate',
+        relationshipGoal: 'long-term',
+        completionPercentage: 70,
+        verified: false,
+        isIncognito: false,
+        updatedAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'profiles', uid), newProfile);
+
+      // Create Preferences doc
+      const newPref: UserPreference = {
+        userId: uid,
+        minAge: Math.max(18, age - 5),
+        maxAge: age + 10,
+        maxDistanceKm: 50,
+        interestedIn,
+        verifiedOnly: false,
+        updatedAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'preferences', uid), newPref);
+
+      setUserAccount(newAccount);
+      setUserProfile(newProfile);
+      setUserPreference(newPref);
+      setIsAdmin(isUserAdmin);
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      throw new Error(err.message || 'Could not complete registration.');
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const res = await signInWithPopup(auth, provider);
+      const user = res.user;
+
+      const profileRef = doc(db, 'profiles', user.uid);
+      const profileSnap = await getDoc(profileRef);
+
+      if (!profileSnap.exists()) {
+        // Create initial default profile for Google user (subject to age completion)
+        const initialProfile: UserProfile = {
+          userId: user.uid,
+          name: user.displayName || 'Member',
+          age: 24, // default adult baseline
+          gender: 'other',
+          interestedIn: 'everyone',
+          city: 'London',
+          country: 'United Kingdom',
+          bio: 'Looking for meaningful conversations, shared adventures, and genuine people.',
+          photos: [
+            user.photoURL ||
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80'
+          ],
+          interests: ['Art', 'Culinary', 'Travel', 'Wellness'],
+          hobbies: ['Music', 'Hiking'],
+          relationshipGoal: 'long-term',
+          completionPercentage: 75,
+          verified: false,
+          isIncognito: false,
+          updatedAt: new Date().toISOString(),
+        };
+        await setDoc(profileRef, initialProfile);
+        setUserProfile(initialProfile);
+      }
+
+      await fetchUserData(user);
+    } catch (err: any) {
+      console.error('Google Sign-In Error:', err);
+      throw new Error(err.message || 'Google authentication failed.');
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+    setCurrentUser(null);
+    setUserAccount(null);
+    setUserProfile(null);
+    setUserPreference(null);
+    setSubscription(null);
+    setIsAdmin(false);
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to send password reset email.');
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    if (currentUser) {
+      await sendEmailVerification(currentUser);
+    }
+  };
+
+  const confirmEmailVerified = async () => {
+    if (currentUser && userAccount) {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        emailVerified: true,
+        updatedAt: new Date().toISOString(),
+      });
+      setUserAccount({ ...userAccount, emailVerified: true });
+    }
+  };
+
+  const updateProfileData = async (data: Partial<UserProfile>) => {
+    if (!currentUser || !userProfile) return;
+
+    if (data.age !== undefined && data.age < 18) {
+      throw new Error('Age must be 18 or older to maintain membership.');
+    }
+
+    try {
+      // Calculate completion score
+      const merged = { ...userProfile, ...data };
+      let score = 30;
+      if (merged.photos && merged.photos.length >= 2) score += 20;
+      if (merged.bio && merged.bio.length >= 40) score += 15;
+      if (merged.interests && merged.interests.length >= 3) score += 10;
+      if (merged.hobbies && merged.hobbies.length >= 2) score += 10;
+      if (merged.profession) score += 5;
+      if (merged.education) score += 5;
+      if (merged.relationshipGoal) score += 5;
+      merged.completionPercentage = Math.min(100, score);
+      merged.updatedAt = new Date().toISOString();
+
+      await setDoc(doc(db, 'profiles', currentUser.uid), merged, { merge: true });
+      setUserProfile(merged);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `profiles/${currentUser.uid}`);
+    }
+  };
+
+  const updatePreferenceData = async (data: Partial<UserPreference>) => {
+    if (!currentUser) return;
+    try {
+      const merged = { ...(userPreference || {}), ...data, userId: currentUser.uid, updatedAt: new Date().toISOString() };
+      await setDoc(doc(db, 'preferences', currentUser.uid), merged, { merge: true });
+      setUserPreference(merged as UserPreference);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `preferences/${currentUser.uid}`);
+    }
+  };
+
+  const submitAgeVerification = async (docType: string, idUrl?: string, selfieUrl?: string) => {
+    if (!currentUser) return;
+    try {
+      const verificationId = `verif_${currentUser.uid}_${Date.now()}`;
+      await setDoc(doc(db, 'verification', verificationId), {
+        id: verificationId,
+        userId: currentUser.uid,
+        userName: userProfile?.name || 'User',
+        ageConfirmed: true,
+        docType,
+        idDocUrl: idUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=400&q=80',
+        selfieUrl: selfieUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+
+      // Update user account
+      if (userAccount) {
+        const updated = { ...userAccount, ageVerified: true };
+        await updateDoc(doc(db, 'users', currentUser.uid), { ageVerified: true });
+        setUserAccount(updated);
+      }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'verification');
+    }
+  };
+
+  const activateSubscription = async (planId: SubscriptionPlanId, price: number) => {
+    if (!currentUser) return;
+    try {
+      let durationDays = 30;
+      if (planId === '7day_premium') durationDays = 7;
+      if (planId === '3month_premium') durationDays = 90;
+      if (planId === 'vip_monthly') durationDays = 30;
+
+      const expires = new Date();
+      expires.setDate(expires.getDate() + durationDays);
+
+      const subRecord: SubscriptionRecord = {
+        userId: currentUser.uid,
+        planId,
+        status: 'active',
+        price,
+        expiresAt: expires.toISOString(),
+        renewsAt: expires.toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+
+      await setDoc(doc(db, 'subscriptions', currentUser.uid), subRecord);
+      setSubscription(subRecord);
+
+      // Record transaction
+      const paymentId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      await setDoc(doc(db, 'payments', paymentId), {
+        id: paymentId,
+        userId: currentUser.uid,
+        type: 'subscription',
+        productId: planId,
+        amount: price,
+        currency: 'USD',
+        status: 'succeeded',
+        createdAt: new Date().toISOString(),
+      });
+
+      // Award bonus perks
+      setSuperLikesCount((prev) => prev + (planId === 'vip_monthly' ? 20 : 10));
+      setBoostsCount((prev) => prev + (planId === 'vip_monthly' ? 5 : 2));
+      setRewindsCount((prev) => prev + 20);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `subscriptions/${currentUser.uid}`);
+    }
+  };
+
+  const useConsumable = (type: 'superlike' | 'boost' | 'rewind'): boolean => {
+    const isSubActive =
+      subscription?.status === 'active' &&
+      new Date(subscription.expiresAt).getTime() > Date.now();
+
+    if (isSubActive) {
+      // Active premium subscribers enjoy unlimited rewinds
+      if (type === 'rewind') return true;
+    }
+
+    if (type === 'superlike') {
+      if (superLikesCount > 0) {
+        setSuperLikesCount((c) => c - 1);
+        return true;
+      }
+      return false;
+    }
+    if (type === 'boost') {
+      if (boostsCount > 0) {
+        setBoostsCount((c) => c - 1);
+        return true;
+      }
+      return false;
+    }
+    if (type === 'rewind') {
+      if (rewindsCount > 0) {
+        setRewindsCount((c) => c - 1);
+        return true;
+      }
+      return false;
+    }
+    return false;
+  };
+
+  const addConsumable = (type: 'superlike' | 'boost' | 'spotlight' | 'rewind', amount: number) => {
+    if (type === 'superlike') setSuperLikesCount((c) => c + amount);
+    if (type === 'boost' || type === 'spotlight') setBoostsCount((c) => c + amount);
+    if (type === 'rewind') setRewindsCount((c) => c + amount);
+  };
+
+  const deleteAccount = async () => {
+    if (!currentUser) return;
+    try {
+      await deleteDoc(doc(db, 'profiles', currentUser.uid));
+      await deleteDoc(doc(db, 'preferences', currentUser.uid));
+      await deleteDoc(doc(db, 'users', currentUser.uid));
+      await deleteUser(currentUser);
+      setCurrentUser(null);
+      setUserAccount(null);
+      setUserProfile(null);
+    } catch (err) {
+      console.error('Delete account error:', err);
+      throw err;
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (currentUser) {
+      await fetchUserData(currentUser);
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        currentUser,
+        userAccount,
+        userProfile,
+        userPreference,
+        subscription,
+        isAdmin,
+        loading,
+        superLikesCount,
+        boostsCount,
+        rewindsCount,
+        loginWithEmail,
+        signupWithEmail,
+        loginWithGoogle,
+        logout,
+        resetPassword,
+        resendVerificationEmail,
+        confirmEmailVerified,
+        updateProfileData,
+        updatePreferenceData,
+        submitAgeVerification,
+        activateSubscription,
+        useConsumable,
+        addConsumable,
+        deleteAccount,
+        refreshProfile,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};

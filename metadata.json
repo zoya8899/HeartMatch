@@ -1,0 +1,6 @@
+{
+  "name": "HeartMatch",
+  "description": "Modern 18+ dating web app featuring intelligent match discovery, real-time messaging, safety controls, and premium subscriptions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

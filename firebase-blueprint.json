@@ -1,0 +1,342 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered user account record with verification status and role",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 256 },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "ageVerified": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "suspended", "deleted"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "lastSeen": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "ageVerified", "status", "createdAt"]
+    },
+    "Profile": {
+      "title": "Profile",
+      "description": "Public dating profile information for an adult user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 50 },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["woman", "man", "nonbinary", "other"] },
+        "interestedIn": { "type": "string", "enum": ["men", "women", "everyone"] },
+        "city": { "type": "string", "maxLength": 100 },
+        "country": { "type": "string", "maxLength": 100 },
+        "bio": { "type": "string", "maxLength": 1000 },
+        "photos": { "type": "array" },
+        "interests": { "type": "array" },
+        "hobbies": { "type": "array" },
+        "profession": { "type": "string", "maxLength": 100 },
+        "education": { "type": "string", "maxLength": 100 },
+        "languages": { "type": "array" },
+        "relationshipGoal": { "type": "string", "enum": ["long-term", "marriage", "casual", "figuring-out"] },
+        "completionPercentage": { "type": "number" },
+        "verified": { "type": "boolean" },
+        "verificationStatus": { "type": "string", "enum": ["unverified", "pending", "verified", "failed"] },
+        "optedIntoDiscovery": { "type": "boolean" },
+        "showCity": { "type": "boolean" },
+        "onlineStatusVisibility": { "type": "boolean" },
+        "isIncognito": { "type": "boolean" },
+        "lastActiveAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "age", "gender", "interestedIn", "city", "country", "bio", "photos"]
+    },
+    "DiscoveryPreference": {
+      "title": "DiscoveryPreference",
+      "description": "Granular user discovery filters for countries, age, distance and goals",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "minAge": { "type": "number" },
+        "maxAge": { "type": "number" },
+        "maxDistanceKm": { "type": "number" },
+        "interestedIn": { "type": "string", "enum": ["men", "women", "everyone"] },
+        "countries": { "type": "array" },
+        "relationshipGoals": { "type": "array" },
+        "interests": { "type": "array" },
+        "languages": { "type": "array" },
+        "verifiedOnly": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "minAge", "maxAge"]
+    },
+    "ProfileActivity": {
+      "title": "ProfileActivity",
+      "description": "Legitimate profile activity and engagement metrics",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "viewsCount": { "type": "number" },
+        "likesReceivedCount": { "type": "number" },
+        "matchesCount": { "type": "number" },
+        "lastActiveAt": { "type": "string" },
+        "isOnline": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "viewsCount", "likesReceivedCount", "matchesCount", "lastActiveAt"]
+    },
+    "Preference": {
+      "title": "Preference",
+      "description": "Discovery criteria and search preferences for matches",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "minAge": { "type": "number" },
+        "maxAge": { "type": "number" },
+        "maxDistanceKm": { "type": "number" },
+        "interestedIn": { "type": "string", "enum": ["men", "women", "everyone"] },
+        "relationshipGoals": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "minAge", "maxAge", "maxDistanceKm"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "Swipe reaction record from one user to another",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "targetUserId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["like", "superlike", "pass"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "targetUserId", "type", "createdAt"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "Mutual connection created when both users like each other",
+      "type": "object",
+      "properties": {
+        "user1Id": { "type": "string", "maxLength": 128 },
+        "user2Id": { "type": "string", "maxLength": 128 },
+        "matchedAt": { "type": "string" },
+        "lastMessageText": { "type": "string", "maxLength": 1000 },
+        "lastMessageTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "unmatched"] },
+        "unmatchedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["user1Id", "user2Id", "matchedAt", "status"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Chat message exchanged between matched users",
+      "type": "object",
+      "properties": {
+        "matchId": { "type": "string", "maxLength": 128 },
+        "senderId": { "type": "string", "maxLength": 128 },
+        "receiverId": { "type": "string", "maxLength": 128 },
+        "text": { "type": "string", "maxLength": 2000 },
+        "imageUrl": { "type": "string", "maxLength": 2048 },
+        "read": { "type": "boolean" },
+        "deleted": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["matchId", "senderId", "receiverId", "text", "read", "createdAt"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "User premium subscription tier and billing status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "planId": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["active", "canceled", "expired"] },
+        "price": { "type": "number" },
+        "expiresAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "planId", "status", "price", "expiresAt", "createdAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Financial ledger record of subscription and consumable purchases",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["subscription", "consumable"] },
+        "productId": { "type": "string", "maxLength": 64 },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 8 },
+        "status": { "type": "string", "enum": ["succeeded", "failed", "refunded"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "productId", "amount", "currency", "status", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Configurable pricing catalogue for memberships and consumables",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 255 },
+        "price": { "type": "number" },
+        "interval": { "type": "string", "enum": ["7days", "1month", "3months", "one_time"] },
+        "badge": { "type": "string", "maxLength": 50 },
+        "category": { "type": "string", "enum": ["subscription", "consumable"] },
+        "features": { "type": "array" },
+        "isActive": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "description", "price", "category", "isActive"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Safety report submitted regarding inappropriate behavior or content",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string", "maxLength": 128 },
+        "reportedUserId": { "type": "string", "maxLength": 128 },
+        "reason": { "type": "string", "maxLength": 100 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "resolved", "dismissed"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["reporterId", "reportedUserId", "reason", "status", "createdAt"]
+    },
+    "Block": {
+      "title": "Block",
+      "description": "User block record prohibiting all interactions",
+      "type": "object",
+      "properties": {
+        "blockerId": { "type": "string", "maxLength": 128 },
+        "blockedUserId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["blockerId", "blockedUserId", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app alerts for likes, matches, messages, and safety notices",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["match", "message", "like", "superlike", "system", "subscription"] },
+        "title": { "type": "string", "maxLength": 120 },
+        "body": { "type": "string", "maxLength": 500 },
+        "read": { "type": "boolean" },
+        "link": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "title", "body", "read", "createdAt"]
+    },
+    "Boost": {
+      "title": "Boost",
+      "description": "Profile visibility boost session record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["boost", "spotlight"] },
+        "expiresAt": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "type", "expiresAt", "isActive", "createdAt"]
+    },
+    "Verification": {
+      "title": "Verification",
+      "description": "Age and identity verification submission for adult approval",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "ageConfirmed": { "type": "boolean" },
+        "docType": { "type": "string", "enum": ["passport", "driving_license", "national_id", "selfie"] },
+        "idDocUrl": { "type": "string", "maxLength": 2048 },
+        "selfieUrl": { "type": "string", "maxLength": 2048 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "reviewedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "ageConfirmed", "status", "createdAt"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Whitelisted administrator credentials and privileges",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 256 },
+        "role": { "type": "string", "enum": ["admin", "superadmin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User authentication and profile account status"
+    },
+    "/profiles/{userId}": {
+      "schema": { "$ref": "#/entities/Profile" },
+      "description": "Public dating profiles discoverable by other adults"
+    },
+    "/preferences/{userId}": {
+      "schema": { "$ref": "#/entities/Preference" },
+      "description": "Private discovery criteria and filtering preferences"
+    },
+    "/discoveryPreferences/{userId}": {
+      "schema": { "$ref": "#/entities/DiscoveryPreference" },
+      "description": "Granular user discovery criteria and country filters"
+    },
+    "/profileActivity/{userId}": {
+      "schema": { "$ref": "#/entities/ProfileActivity" },
+      "description": "Legitimate profile activity and engagement counts"
+    },
+    "/likes/{likeId}": {
+      "schema": { "$ref": "#/entities/Like" },
+      "description": "Swiping interaction records between users"
+    },
+    "/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/Match" },
+      "description": "Mutual connection matches"
+    },
+    "/matches/{matchId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Real-time chat messages inside a match"
+    },
+    "/subscriptions/{userId}": {
+      "schema": { "$ref": "#/entities/Subscription" },
+      "description": "Active premium subscription metadata"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Ledger of successful transactions"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Configurable products and pricing table"
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "User reports submitted to moderation"
+    },
+    "/blocks/{blockId}": {
+      "schema": { "$ref": "#/entities/Block" },
+      "description": "User blocks list"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Private user notifications"
+    },
+    "/boosts/{boostId}": {
+      "schema": { "$ref": "#/entities/Boost" },
+      "description": "Active profile boosts and spotlights"
+    },
+    "/verification/{verificationId}": {
+      "schema": { "$ref": "#/entities/Verification" },
+      "description": "18+ age verification documents and review queue"
+    },
+    "/adminUsers/{userId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Admin access control whitelist"
+    }
+  }
+}
