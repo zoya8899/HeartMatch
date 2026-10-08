@@ -15,6 +15,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { UserProfile } from '../../types';
+import { isPlaceholderPhoto } from '../profile/PhotoPortfolioManager';
 
 interface VerifiedProfileCardProps {
   profile: UserProfile;
@@ -56,9 +57,11 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
   const [photoIndex, setPhotoIndex] = useState(0);
   const [actionFeedback, setActionFeedback] = useState<'liked' | 'passed' | 'superliked' | null>(null);
 
-  const photos = profile.photos && profile.photos.length > 0
-    ? profile.photos
-    : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'];
+  const realPhotos = profile.photos && profile.photos.length > 0
+    ? profile.photos.filter((p) => !isPlaceholderPhoto(p))
+    : [];
+  const hasRealPhotos = realPhotos.length > 0;
+  const photos = hasRealPhotos ? realPhotos : (profile.isRealUser ? [] : (profile.photos || []));
 
   const flag = COUNTRY_FLAGS[profile.country] || '🌐';
 
@@ -104,12 +107,22 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
     >
       {/* Photo Area */}
       <div className="relative aspect-[3/4] w-full bg-stone-900 overflow-hidden select-none">
-        <img
-          src={photos[photoIndex]}
-          alt={profile.name}
-          loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {photos[photoIndex] ? (
+          <img
+            src={photos[photoIndex]}
+            alt={profile.name}
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-tr from-stone-900 via-rose-950 to-stone-900 flex flex-col items-center justify-center p-6 text-white text-center">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-rose-600 to-rose-400 flex items-center justify-center text-3xl font-bold shadow-lg mb-2">
+              {profile.name?.charAt(0)?.toUpperCase() || '👤'}
+            </div>
+            <p className="text-xs text-stone-200 font-semibold">{profile.name}</p>
+            <span className="text-[10px] text-rose-300 mt-1">Real Registered Member</span>
+          </div>
+        )}
 
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/20 to-stone-950/30" />

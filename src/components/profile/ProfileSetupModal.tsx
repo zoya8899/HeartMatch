@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { Gender, InterestedIn, RelationshipGoal, UserProfile } from '../../types';
 import { geminiService } from '../../services/geminiService';
+import { PhotoPortfolioManager, isPlaceholderPhoto } from './PhotoPortfolioManager';
 
 interface ProfileSetupModalProps {
   isOpen: boolean;
@@ -51,7 +52,9 @@ export const ProfileSetupModal: React.FC<ProfileSetupModalProps> = ({
     userProfile?.relationshipGoal || 'long-term'
   );
   const [photos, setPhotos] = useState<string[]>(
-    userProfile?.photos && userProfile.photos.length > 0 ? userProfile.photos : []
+    userProfile?.photos && userProfile.photos.length > 0
+      ? userProfile.photos.filter((p) => !isPlaceholderPhoto(p))
+      : []
   );
   const [selectedInterests, setSelectedInterests] = useState<string[]>(
     userProfile?.interests && userProfile.interests.length > 0
@@ -78,7 +81,8 @@ export const ProfileSetupModal: React.FC<ProfileSetupModalProps> = ({
       if (userProfile.profession) setProfession(userProfile.profession);
       if (userProfile.relationshipGoal) setRelationshipGoal(userProfile.relationshipGoal);
       if (userProfile.photos && userProfile.photos.length > 0 && photos.length === 0) {
-        setPhotos(userProfile.photos);
+        const cleaned = userProfile.photos.filter((p) => !isPlaceholderPhoto(p));
+        if (cleaned.length > 0) setPhotos(cleaned);
       }
       if (userProfile.interests && userProfile.interests.length > 0) {
         setSelectedInterests(userProfile.interests);

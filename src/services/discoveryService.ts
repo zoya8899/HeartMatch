@@ -94,10 +94,13 @@ export const discoveryService = {
           return true;
         });
 
-        // Merge real profiles at the top of the feed and deduplicate
+        // Stop showing hardcoded static fake profiles once real registered users exist. Prioritize showing real user profiles!
+        const nonRealRemaining = data.profiles.filter(
+          (dp: UserProfile) => !eligibleReal.some((rp) => rp.userId === dp.userId) && !dp.isRealUser
+        );
         const mergedProfiles = [
           ...eligibleReal,
-          ...data.profiles.filter((dp: UserProfile) => !eligibleReal.some((rp) => rp.userId === dp.userId)),
+          ...(eligibleReal.length >= 6 ? [] : nonRealRemaining),
         ];
 
         data.profiles = mergedProfiles;
@@ -115,8 +118,10 @@ export const discoveryService = {
         if (stored) realProfiles = JSON.parse(stored);
       } catch (e) {}
 
-      // Fallback filtering: Prioritize real registered users first!
-      let list = [...realProfiles, ...INITIAL_DISCOVERY_PROFILES.filter(p => !realProfiles.some(rp => rp.userId === p.userId))];
+      // Fallback filtering: Stop showing static fake profiles if real profiles exist!
+      let list = realProfiles.length >= 6
+        ? [...realProfiles]
+        : [...realProfiles, ...INITIAL_DISCOVERY_PROFILES.filter(p => !realProfiles.some(rp => rp.userId === p.userId))];
       if (params.country && params.country !== 'all') {
         list = list.filter((p) => p.country.toLowerCase() === params.country?.toLowerCase());
       }

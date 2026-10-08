@@ -69,13 +69,15 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Exclude current user from candidate cards
     const filteredReal = realProfiles.filter((p) => !currentUser || p.userId !== currentUser.uid);
 
-    // Prioritize real users first, then append mock seed profiles
-    let candidates = [
-      ...filteredReal,
-      ...INITIAL_DISCOVERY_PROFILES.filter(
-        (p) => (!currentUser || p.userId !== currentUser.uid) && !filteredReal.some((rp) => rp.userId === p.userId)
-      ),
-    ];
+    // Prioritize real users first; stop showing static fake profiles if real registered users exist
+    let candidates = filteredReal.length >= 6
+      ? [...filteredReal]
+      : [
+          ...filteredReal,
+          ...INITIAL_DISCOVERY_PROFILES.filter(
+            (p) => (!currentUser || p.userId !== currentUser.uid) && !filteredReal.some((rp) => rp.userId === p.userId)
+          ),
+        ];
 
     // Exclude current user
     if (currentUser) {
