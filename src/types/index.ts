@@ -9,6 +9,10 @@ export interface UserAccount {
   status: 'active' | 'suspended' | 'deleted';
   suspendedReason?: string;
   suspendedAt?: string;
+  strikeCount?: number;
+  lastStrikeAt?: string;
+  strike1Reason?: string;
+  isPakistanFreeAccess?: boolean;
   createdAt: string;
   updatedAt?: string;
   lastSeen?: string;
@@ -151,6 +155,8 @@ export interface MessageRecord {
   receiverId: string;
   text: string;
   imageUrl?: string;
+  voiceNoteUrl?: string;
+  voiceDuration?: string;
   read: boolean;
   deleted?: boolean;
   createdAt: string;
@@ -163,11 +169,30 @@ export type SubscriptionPlanId = '7day_premium' | 'monthly_premium' | '3month_pr
 export interface SubscriptionRecord {
   userId: string;
   planId: SubscriptionPlanId;
-  status: 'active' | 'canceled' | 'expired';
+  status: 'active' | 'canceled' | 'expired' | 'pending_verification';
   price: number;
   expiresAt: string;
   renewsAt?: string;
   createdAt: string;
+}
+
+export interface PaymentProofRecord {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  planId: string;
+  planTitle: string;
+  amountUsd: number;
+  amountPkr: number;
+  method: 'JazzCash' | 'USDT';
+  transactionId: string;
+  senderDetail: string;
+  receiptUrl: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  reviewedAt?: string;
+  adminDecisionNotes?: string;
 }
 
 export interface PaymentRecord {

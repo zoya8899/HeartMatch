@@ -12,8 +12,8 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onNavi
   const { userProfile, updateProfileData } = useAuth();
 
   const [name, setName] = useState(userProfile?.name || '');
-  const [city, setCity] = useState(userProfile?.city || 'London');
-  const [country, setCountry] = useState(userProfile?.country || 'United Kingdom');
+  const [city, setCity] = useState(userProfile?.city || 'Lahore');
+  const [country, setCountry] = useState(userProfile?.country || 'Pakistan');
   const [profession, setProfession] = useState(userProfile?.profession || 'Product Director');
   const [education, setEducation] = useState(userProfile?.education || 'London School of Economics');
   const [relationshipGoal, setRelationshipGoal] = useState<RelationshipGoal>(

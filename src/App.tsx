@@ -136,6 +136,7 @@ function AppContent() {
           <ProfileDetailsScreen
             profile={selectedProfile}
             onBack={() => navigateTo('discover')}
+            onNavigate={navigateTo}
             onOpenReportModal={(id, name) => {
               setReportTarget({ id, name });
               navigateTo('report_user');

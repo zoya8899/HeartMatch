@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_PRODUCTS } from '../../services/seedData';
 import { DiscoveryExplorer } from '../discovery/DiscoveryExplorer';
+import { SignUpGuideVideoBanner } from '../landing/SignUpGuideVideoBanner';
 
 interface LandingScreenProps {
   onNavigate: (screen: string) => void;
@@ -26,15 +27,17 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 selection:bg-rose-100 selection:text-rose-900">
       {/* Top Banner: 18+ Verified Platform */}
-      <div className="bg-stone-900 text-stone-300 px-4 py-2 text-center text-xs font-medium border-b border-stone-800 flex items-center justify-center gap-2">
+      <div className="bg-stone-900 text-stone-300 px-4 py-2 text-center text-xs font-medium border-b border-stone-800 flex items-center justify-center gap-2 flex-wrap">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-white font-semibold">Strictly 18+ Verified Dating</span>
+        <span className="text-white font-semibold">Strictly 18+ Verified Matchmaking</span>
         <span className="text-stone-500">·</span>
-        <span className="hidden sm:inline">Operating across the United States, United Kingdom, Canada, Australia, UAE & Europe</span>
+        <span className="text-emerald-400 font-bold">🇵🇰 Pakistan 100% Free Access</span>
+        <span className="text-stone-500">·</span>
+        <span className="hidden sm:inline text-stone-400">USA · UK · Canada · Australia · UAE · Europe</span>
         <span className="text-stone-500">·</span>
         <button
           onClick={() => onNavigate('safety_center')}
-          className="text-stone-300 hover:text-white underline underline-offset-2 ml-1"
+          className="text-stone-300 hover:text-white underline underline-offset-2 ml-1 cursor-pointer"
         >
           Safety Charter
         </button>
@@ -155,6 +158,11 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onNavigate }) => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Dedicated "How It Works: 30-sec Sign Up Guide" Video Container */}
+          <div className="mt-12 lg:mt-16">
+            <SignUpGuideVideoBanner onOpenAuth={(mode) => onNavigate(mode)} />
           </div>
         </div>
       </section>

@@ -13,6 +13,7 @@ import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { useAuth } from './AuthContext';
 import { MessageRecord, MatchRecord } from '../types';
 import { geminiService } from '../services/geminiService';
+import { checkContentForAbuse, STRIKE_1_WARNING_BANNER } from '../services/moderationFilter';
 
 interface ChatContextType {
   activeMatch: MatchRecord | null;
@@ -21,7 +22,8 @@ interface ChatContextType {
   sendingMessage: boolean;
   moderationWarning: string | null;
   setActiveMatch: (match: MatchRecord | null) => void;
-  sendMessage: (text: string, imageUrl?: string) => Promise<boolean>;
+  sendMessage: (text: string, imageUrl?: string, voiceNoteUrl?: string, voiceDuration?: string) => Promise<boolean>;
+  sendVoiceNote: (voiceUrl: string, duration?: string) => Promise<boolean>;
   deleteMessage: (messageId: string) => Promise<void>;
   markMessagesAsRead: () => Promise<void>;
   dismissWarning: () => void;
@@ -30,7 +32,7 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, recordStrike } = useAuth();
   const [activeMatch, setActiveMatch] = useState<MatchRecord | null>(null);
   const [messages, setMessages] = useState<MessageRecord[]>([]);
   const [isTyping, setIsTyping] = useState<boolean>(false);
@@ -68,25 +70,55 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, [currentUser, activeMatch]);
 
-  const sendMessage = async (text: string, imageUrl?: string): Promise<boolean> => {
-    if (!currentUser || !activeMatch || (!text.trim() && !imageUrl)) return false;
+  const sendMessage = async (
+    text: string,
+    imageUrl?: string,
+    voiceNoteUrl?: string,
+    voiceDuration?: string
+  ): Promise<boolean> => {
+    if (!currentUser || !activeMatch || (!text.trim() && !imageUrl && !voiceNoteUrl)) return false;
 
     setSendingMessage(true);
     setModerationWarning(null);
 
     try {
+      // 1. Two-Strike Abuse & Spam Moderation Filter (Urdu / Roman Urdu abuses, explicit terms, links/spam)
+      if (text.trim()) {
+        const abuseCheck = checkContentForAbuse(text);
+        if (abuseCheck.isOffensive) {
+          // Block message instantly so it is NEVER delivered!
+          const { isSuspended } = await recordStrike(
+            abuseCheck.reason || 'Offensive language or spam',
+            text.trim()
+          );
+
+          if (isSuspended) {
+            setModerationWarning(
+              'Your account has been permanently disabled and blocked due to repeated violations of HeartMatch community guidelines (Strike 2).'
+            );
+          } else {
+            // Strike 1 banner
+            setModerationWarning(STRIKE_1_WARNING_BANNER);
+          }
+
+          setSendingMessage(false);
+          return false; // Message is rejected and NOT delivered!
+        }
+      }
+
       let isFlagged = false;
       let flagReasonText: string | undefined = undefined;
 
-      // Run AI Safety & Moderation check using Gemini
+      // Optional AI Safety secondary check
       if (text.trim()) {
-        const modResult = await geminiService.moderateMessage(text);
-        if (modResult.flaggedForReview || !modResult.safe) {
-          isFlagged = true;
-          flagReasonText = modResult.reason || 'Flagged by AI safety filter for human review';
-          setModerationWarning(
-            `Safety Notice: Your message triggered Trust & Safety review (${modResult.category || 'content flag'}). It has been queued for human moderation.`
-          );
+        try {
+          const modResult = await geminiService.moderateMessage(text);
+          if (modResult.flaggedForReview || !modResult.safe) {
+            isFlagged = true;
+            flagReasonText = modResult.reason || 'Flagged by AI safety filter for human review';
+          }
+        } catch {
+          // fallback gracefully
         }
       }
 
@@ -100,6 +132,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         receiverId,
         text: text.trim(),
         imageUrl: imageUrl || '',
+        voiceNoteUrl: voiceNoteUrl || '',
+        voiceDuration: voiceDuration || '',
         read: false,
         deleted: false,
         flagged: isFlagged,
@@ -110,13 +144,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await setDoc(doc(db, 'matches', activeMatch.id, 'messages', messageId), newMsg);
 
       // Update parent match record's last message
+      const lastMessageLabel = voiceNoteUrl
+        ? '🎤 Voice Note'
+        : imageUrl
+        ? '📷 Sent a photo'
+        : text.trim();
+
       await updateDoc(doc(db, 'matches', activeMatch.id), {
-        lastMessageText: text.trim() || 'Sent a photo',
+        lastMessageText: lastMessageLabel,
         lastMessageTime: new Date().toISOString(),
       });
 
       // Simulate match partner reply for realistic interactive conversation testing
-      triggerInteractiveMatchReply(text.trim());
+      if (text.trim() || voiceNoteUrl) {
+        triggerInteractiveMatchReply(text.trim() || 'Sent a voice note');
+      }
 
       setSendingMessage(false);
       return true;
@@ -125,6 +167,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSendingMessage(false);
       return false;
     }
+  };
+
+  const sendVoiceNote = async (voiceUrl: string, duration: string = '0:15'): Promise<boolean> => {
+    return sendMessage('', undefined, voiceUrl, duration);
   };
 
   const triggerInteractiveMatchReply = (userMessage: string) => {
@@ -213,6 +259,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         moderationWarning,
         setActiveMatch,
         sendMessage,
+        sendVoiceNote,
         deleteMessage,
         markMessagesAsRead,
         dismissWarning,

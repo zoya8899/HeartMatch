@@ -24,26 +24,30 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMatch } from '../../contexts/MatchContext';
 import { UserProfile, AICompatibilityResponse } from '../../types';
 import { geminiService } from '../../services/geminiService';
+import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
 
 interface ProfileDetailsScreenProps {
   profile: UserProfile;
   onBack: () => void;
   onOpenReportModal: (userId: string, name: string) => void;
   onOpenChat?: (matchId: string) => void;
+  onNavigate?: (screen: string) => void;
 }
 
 export const ProfileDetailsScreen: React.FC<ProfileDetailsScreenProps> = ({
   profile,
   onBack,
   onOpenReportModal,
+  onNavigate,
 }) => {
-  const { userProfile } = useAuth();
+  const { userProfile, isPakistanUser, isPremium } = useAuth();
   const { swipe } = useMatch();
 
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [compatibility, setCompatibility] = useState<AICompatibilityResponse | null>(null);
   const [loadingCompat, setLoadingCompat] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   const photos = profile.photos && profile.photos.length > 0
     ? profile.photos
@@ -61,6 +65,12 @@ export const ProfileDetailsScreen: React.FC<ProfileDetailsScreenProps> = ({
   };
 
   const handleAction = async (action: 'like' | 'pass' | 'superlike') => {
+    if (action !== 'pass' && profile.country && profile.country.toLowerCase() !== 'pakistan') {
+      if (isPakistanUser && !isPremium) {
+        setUpgradeModalOpen(true);
+        return;
+      }
+    }
     await swipe(action);
     onBack();
   };
@@ -343,6 +353,22 @@ export const ProfileDetailsScreen: React.FC<ProfileDetailsScreenProps> = ({
           )}
         </div>
       </div>
+
+      {/* International Upgrade Modal */}
+      <InternationalUpgradeModal
+        isOpen={upgradeModalOpen}
+        targetCountry={profile.country}
+        targetProfileName={profile.name}
+        onClose={() => setUpgradeModalOpen(false)}
+        onUpgrade={() => {
+          setUpgradeModalOpen(false);
+          onNavigate?.('premium_plans');
+        }}
+        onExplorePakistan={() => {
+          setUpgradeModalOpen(false);
+          onBack();
+        }}
+      />
     </div>
   );
 };

@@ -17,7 +17,9 @@ import {
   BadgeCheck,
 } from 'lucide-react';
 import { useProducts } from '../../contexts/ProductsContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { SubscriptionPlanId } from '../../types';
+import { formatDualPrice } from '../../utils/currency';
 
 interface PremiumPlansScreenProps {
   onNavigate: (screen: string, extra?: any) => void;
@@ -25,6 +27,7 @@ interface PremiumPlansScreenProps {
 
 export const PremiumPlansScreen: React.FC<PremiumPlansScreenProps> = ({ onNavigate }) => {
   const { plans, consumables, loading } = useProducts();
+  const { isPakistanUser } = useAuth();
   const [billingCycle, setBillingCycle] = useState<'all' | 'monthly' | 'one_time'>('all');
 
   const coreFeaturesList = [
@@ -115,6 +118,18 @@ export const PremiumPlansScreen: React.FC<PremiumPlansScreenProps> = ({ onNaviga
           <Sparkles className="w-3.5 h-3.5 text-rose-600" />
           <span>Configurable Stripe pricing · Safe 18+ adult environment · Cancel anytime</span>
         </div>
+
+        {isPakistanUser && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-left space-y-1 animate-in fade-in">
+            <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+              <span className="text-base">🇵🇰</span>
+              <span>100% Free Unlimited Access in Pakistan Active</span>
+            </div>
+            <p className="text-[11px] text-emerald-800 leading-relaxed">
+              You are currently enjoying 100% free unlimited messaging, voice notes, browsing, and connecting with local Pakistani singles without any paywall or subscription fee!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Subscription Plans Section */}
@@ -166,8 +181,10 @@ export const PremiumPlansScreen: React.FC<PremiumPlansScreenProps> = ({ onNaviga
                   <p className="text-xs text-stone-500 mt-1 min-h-[34px] leading-relaxed">{p.description}</p>
 
                   <div className="my-6">
-                    <span className="text-4xl font-serif font-bold text-stone-950">${p.price.toFixed(2)}</span>
-                    <span className="text-xs text-stone-500 ml-1">/ {intervalLabel}</span>
+                    <span className="text-2xl sm:text-3xl font-serif font-bold text-stone-950 block">
+                      {formatDualPrice(p.price)}
+                    </span>
+                    <span className="text-xs text-stone-500 block mt-1">per {intervalLabel}</span>
                   </div>
 
                   <div className="space-y-2.5 border-t border-stone-100 pt-5 text-xs text-stone-600">
@@ -257,7 +274,9 @@ export const PremiumPlansScreen: React.FC<PremiumPlansScreenProps> = ({ onNaviga
                   <p className="text-xs text-stone-500 mt-1 min-h-[32px]">{item.description}</p>
 
                   <div className="my-5">
-                    <span className="text-3xl font-serif font-bold text-stone-950">${item.price.toFixed(2)}</span>
+                    <span className="text-xl sm:text-2xl font-serif font-bold text-stone-950 block">
+                      {formatDualPrice(item.price)}
+                    </span>
                     <span className="text-[11px] text-stone-400 block mt-0.5">One-time purchase</span>
                   </div>
 

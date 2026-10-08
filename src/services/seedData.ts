@@ -124,6 +124,7 @@ export const DEFAULT_PRODUCTS: ProductItem[] = [
 ];
 
 export const ELIGIBLE_DISCOVERY_COUNTRIES: { name: string; flag: string; code: string }[] = [
+  { name: 'Pakistan', flag: '🇵🇰', code: 'PK' },
   { name: 'United States', flag: '🇺🇸', code: 'US' },
   { name: 'United Kingdom', flag: '🇬🇧', code: 'GB' },
   { name: 'Canada', flag: '🇨🇦', code: 'CA' },
@@ -137,6 +138,145 @@ export const ELIGIBLE_DISCOVERY_COUNTRIES: { name: string; flag: string; code: s
 ];
 
 export const INITIAL_DISCOVERY_PROFILES: UserProfile[] = [
+  {
+    userId: 'user_ayesha_lahore',
+    name: 'Ayesha',
+    age: 26,
+    gender: 'woman',
+    interestedIn: 'men',
+    city: 'Lahore',
+    country: 'Pakistan',
+    showCity: true,
+    bio: 'Physician in pediatric medicine. Avid chai lover, weekend oil painter, and historical architecture enthusiast. Seeking an empathetic, ambitious partner with mutual respect, family values, and a good sense of humor.',
+    photos: [
+      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80'
+    ],
+    interests: ['Medicine', 'Classical Music', 'Old Lahore Cafes', 'Literature', 'Travel'],
+    hobbies: ['Oil Painting', 'Baking Kardamom Cake', 'Reading Urdu Poetry', 'Badminton'],
+    profession: 'Pediatric Resident Doctor',
+    education: 'King Edward Medical University',
+    languages: ['Urdu', 'English', 'Punjabi'],
+    relationshipGoal: 'marriage',
+    completionPercentage: 100,
+    verified: true,
+    verificationStatus: 'verified',
+    profileVerified: true,
+    optedIntoDiscovery: true,
+    onlineStatusVisibility: true,
+    isIncognito: false,
+    lastActiveAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    registeredAt: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
+    prompts: [
+      { id: 'p_ay1', question: 'My favorite weekend ritual', answer: 'Exploring Walled City hidden cafes with fresh Karak chai and good conversation.' },
+      { id: 'p_ay2', question: 'What I value most', answer: 'Honesty, emotional maturity, kindness toward elders, and shared aspirations.' }
+    ],
+    lifestyle: {
+      drinking: 'never',
+      smoking: 'no',
+      workout: 'often',
+      pets: 'Love Persian cats',
+      height: '5 ft 6 in (168 cm)',
+    },
+    voiceNote: {
+      topic: 'What makes a great conversation',
+      duration: '0:28',
+    },
+    updatedAt: new Date().toISOString()
+  },
+  {
+    userId: 'user_hamza_isb',
+    name: 'Hamza',
+    age: 28,
+    gender: 'man',
+    interestedIn: 'women',
+    city: 'Islamabad',
+    country: 'Pakistan',
+    showCity: true,
+    bio: 'Software engineer building cloud architectures for global startups. Hiking enthusiast who spends weekends in the Margalla Hills. Appreciates genuine depth, simple coffee chats, and continuous learning.',
+    photos: [
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80'
+    ],
+    interests: ['Cloud Tech', 'Margalla Trail 3', 'Specialty Coffee', 'Podcasts', 'Photography'],
+    hobbies: ['Mountain Biking', 'Weekend BBQ', 'Sci-Fi Reading', 'Acoustic Guitar'],
+    profession: 'Lead Cloud Architect',
+    education: 'FAST-NUCES Islamabad',
+    languages: ['Urdu', 'English'],
+    relationshipGoal: 'long-term',
+    completionPercentage: 100,
+    verified: true,
+    verificationStatus: 'verified',
+    profileVerified: true,
+    optedIntoDiscovery: true,
+    onlineStatusVisibility: true,
+    isIncognito: false,
+    lastActiveAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    registeredAt: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
+    prompts: [
+      { id: 'p_hm1', question: 'A perfect Sunday', answer: 'Sunrise hike on Trail 5 followed by Monal breakfast and reading.' },
+      { id: 'p_hm2', question: 'Together we could', answer: 'Travel across Hunza and Gilgit-Baltistan and build an inspiring life.' }
+    ],
+    lifestyle: {
+      drinking: 'never',
+      smoking: 'no',
+      workout: 'daily',
+      pets: 'Outdoor lover',
+      height: '5 ft 11 in (180 cm)',
+    },
+    voiceNote: {
+      topic: 'Margalla trails and weekend morning serenity',
+      duration: '0:35',
+    },
+    updatedAt: new Date().toISOString()
+  },
+  {
+    userId: 'user_zara_khi',
+    name: 'Zara',
+    age: 25,
+    gender: 'woman',
+    interestedIn: 'men',
+    city: 'Karachi',
+    country: 'Pakistan',
+    showCity: true,
+    bio: 'Product designer & creative lead. Big fan of seaside sunsets at Clifton, spicy Biryani debates, indie music, and typography. Looking for someone grounded, supportive, and kind-hearted.',
+    photos: [
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80'
+    ],
+    interests: ['Product Design', 'Visual Arts', 'Seaside Walks', 'Culinary', 'Music'],
+    hobbies: ['Pottery', 'Film Photography', 'Cafe Hopping in Clifton', 'Swimming'],
+    profession: 'Senior UX Designer',
+    education: 'Indus Valley School of Art and Architecture',
+    languages: ['Urdu', 'English'],
+    relationshipGoal: 'long-term',
+    completionPercentage: 95,
+    verified: true,
+    verificationStatus: 'verified',
+    profileVerified: true,
+    optedIntoDiscovery: true,
+    onlineStatusVisibility: true,
+    isIncognito: false,
+    lastActiveAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+    registeredAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+    prompts: [
+      { id: 'p_zk1', question: 'The way to win me over', answer: 'Thoughtful conversation, respecting personal growth, and appreciating art.' }
+    ],
+    lifestyle: {
+      drinking: 'never',
+      smoking: 'no',
+      workout: 'often',
+      pets: 'Cat person',
+      height: '5 ft 5 in (165 cm)',
+    },
+    voiceNote: {
+      topic: 'Seaside breezes and favorite Karachi food spots',
+      duration: '0:31',
+    },
+    updatedAt: new Date().toISOString()
+  },
   {
     userId: 'user_sophia_ny',
     name: 'Sophia',

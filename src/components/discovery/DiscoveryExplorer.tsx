@@ -26,6 +26,8 @@ import { discoveryService, PlatformStats } from '../../services/discoveryService
 import { VerifiedProfileCard } from './VerifiedProfileCard';
 import { CountryDiscoveryBar } from './CountryDiscoveryBar';
 import { VisitorAuthPromptModal } from './VisitorAuthPromptModal';
+import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface DiscoveryExplorerProps {
   isLoggedIn: boolean;
@@ -38,6 +40,7 @@ interface DiscoveryExplorerProps {
   onBlock?: (profile: UserProfile) => void;
   onNavigateToAuth?: (mode: 'signup' | 'login') => void;
   onNavigateToPreferences?: () => void;
+  onNavigateToPremium?: () => void;
 }
 
 const SECTIONS_CONFIG: {
@@ -102,10 +105,17 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
   onBlock,
   onNavigateToAuth,
   onNavigateToPreferences,
+  onNavigateToPremium,
 }) => {
+  const { isPakistanUser, isPremium } = useAuth();
+
   // Active Section & Country filter
   const [activeSection, setActiveSection] = useState<DiscoverySectionId>('verified_singles');
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+
+  // International Upgrade Modal State
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState<boolean>(false);
+  const [upgradeTargetProfile, setUpgradeTargetProfile] = useState<UserProfile | null>(null);
 
   // Data states
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -167,7 +177,7 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
       const res = await discoveryService.fetchProfiles({
         section: activeSection,
         country: selectedCountry || undefined,
-        userCountry: currentUserProfile?.country || 'United States',
+        userCountry: currentUserProfile?.country || 'Pakistan',
         gender: filterGender !== 'everyone' ? filterGender : undefined,
         relationshipGoal: filterGoal !== 'all' ? filterGoal : undefined,
         minAge: filterMinAge > 18 ? filterMinAge : undefined,
@@ -218,6 +228,37 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
     setVisitorTargetProfile(profile);
     setVisitorActionType(actionName);
     setVisitorModalOpen(true);
+  };
+
+  const isTargetInternational = (p: UserProfile) => {
+    return p.country && p.country.toLowerCase() !== 'pakistan';
+  };
+
+  const handleCardView = (p: UserProfile) => {
+    if (isLoggedIn && isPakistanUser && !isPremium && isTargetInternational(p)) {
+      setUpgradeTargetProfile(p);
+      setUpgradeModalOpen(true);
+      return;
+    }
+    onOpenProfileDetails?.(p);
+  };
+
+  const handleCardLike = (p: UserProfile) => {
+    if (isLoggedIn && isPakistanUser && !isPremium && isTargetInternational(p)) {
+      setUpgradeTargetProfile(p);
+      setUpgradeModalOpen(true);
+      return;
+    }
+    onLike?.(p);
+  };
+
+  const handleCardSuperLike = (p: UserProfile) => {
+    if (isLoggedIn && isPakistanUser && !isPremium && isTargetInternational(p)) {
+      setUpgradeTargetProfile(p);
+      setUpgradeModalOpen(true);
+      return;
+    }
+    onSuperLike?.(p);
   };
 
   const currentSectionConfig = SECTIONS_CONFIG.find((s) => s.id === activeSection) || SECTIONS_CONFIG[0];
@@ -458,10 +499,10 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
                 key={profile.userId}
                 profile={profile}
                 isLoggedIn={isLoggedIn}
-                onLike={onLike}
+                onLike={handleCardLike}
                 onPass={onPass}
-                onSuperLike={onSuperLike}
-                onViewProfile={onOpenProfileDetails}
+                onSuperLike={handleCardSuperLike}
+                onViewProfile={handleCardView}
                 onReport={onReport}
                 onBlock={onBlock}
                 onVisitorAction={handleVisitorAction}
@@ -561,6 +602,22 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
         onClose={() => setVisitorModalOpen(false)}
         onSignUp={() => onNavigateToAuth && onNavigateToAuth('signup')}
         onSignIn={() => onNavigateToAuth && onNavigateToAuth('login')}
+      />
+
+      {/* International Connections Upgrade Modal for Pakistan Free Users */}
+      <InternationalUpgradeModal
+        isOpen={upgradeModalOpen}
+        targetCountry={upgradeTargetProfile?.country}
+        targetProfileName={upgradeTargetProfile?.name}
+        onClose={() => setUpgradeModalOpen(false)}
+        onUpgrade={() => {
+          setUpgradeModalOpen(false);
+          onNavigateToPremium?.();
+        }}
+        onExplorePakistan={() => {
+          setUpgradeModalOpen(false);
+          setSelectedCountry('Pakistan');
+        }}
       />
     </div>
   );

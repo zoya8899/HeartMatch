@@ -68,6 +68,11 @@ export const CountryDiscoveryBar: React.FC<CountryDiscoveryBarProps> = ({
             >
               <span className="text-base leading-none">{c.flag}</span>
               <span>{c.country}</span>
+              {c.country.toLowerCase() === 'pakistan' && (
+                <span className="bg-emerald-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                  100% Free
+                </span>
+              )}
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                   isSelected

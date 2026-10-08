@@ -41,14 +41,18 @@ import {
   VerificationRecord,
   AccountAppealRecord,
   UserProfile,
+  PaymentProofRecord,
 } from '../../types';
 import { DEFAULT_PRODUCTS } from '../../services/seedData';
+import { formatDualPrice } from '../../utils/currency';
 
 export const AdminDashboard: React.FC = () => {
   const { currentUser, isAdmin } = useAuth();
   const { products: contextProducts, updateProduct, refreshProducts } = useProducts();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'verifications' | 'moderation' | 'appeals' | 'pricing' | 'promos'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'payments' | 'verifications' | 'moderation' | 'appeals' | 'pricing' | 'promos'
+  >('payments');
 
   // Products pricing catalog state
   const [products, setProducts] = useState<ProductItem[]>(contextProducts || DEFAULT_PRODUCTS);
@@ -147,6 +151,43 @@ export const AdminDashboard: React.FC = () => {
     },
   ]);
 
+  // Pending Payments Review Queue (Manual Verification: JazzCash & USDT)
+  const [paymentProofs, setPaymentProofs] = useState<PaymentProofRecord[]>([
+    {
+      id: 'proof_demo_01',
+      userId: 'user_usman_lahore',
+      userEmail: 'usman.ali@gmail.com',
+      userName: 'Usman Ali (28)',
+      planId: 'monthly_premium',
+      planTitle: 'Monthly Premium',
+      amountUsd: 24.99,
+      amountPkr: 7000,
+      method: 'JazzCash',
+      transactionId: 'TID-JC-984210492',
+      senderDetail: '03001234567',
+      receiptUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80',
+      status: 'pending',
+      submittedAt: new Date(Date.now() - 1800000).toISOString(),
+    },
+    {
+      id: 'proof_demo_02',
+      userId: 'user_bilal_karachi',
+      userEmail: 'bilal.k@outlook.com',
+      userName: 'Bilal Khan (31)',
+      planId: '7day_premium',
+      planTitle: '7-Day Premium',
+      amountUsd: 9.99,
+      amountPkr: 2800,
+      method: 'USDT',
+      transactionId: '0x8f2a41d9c02e5b7a19283e4c8d92f1b0a8c291823719283719283719283',
+      senderDetail: 'TYq1b9XkLmN8oPqRsTuVwXyZ1234567890',
+      receiptUrl: 'https://images.unsplash.com/photo-1580048915913-4f8f5cb481c4?auto=format&fit=crop&w=600&q=80',
+      status: 'pending',
+      submittedAt: new Date(Date.now() - 3600000).toISOString(),
+    },
+  ]);
+  const [selectedSlipUrl, setSelectedSlipUrl] = useState<string | null>(null);
+
   // Promo codes
   const [promoCodes, setPromoCodes] = useState<{ code: string; discount: string; uses: number; active: boolean }[]>([
     { code: 'WELCOME50', discount: '50% Off First Month', uses: 142, active: true },
@@ -189,8 +230,93 @@ export const AdminDashboard: React.FC = () => {
       if (appealItems && appealItems.length > 0) {
         setAppeals(appealItems);
       }
+
+      // Payment Proofs from Firestore
+      const proofSnap = await getDocs(collection(db, 'payment_proofs'));
+      if (!proofSnap.empty) {
+        const realProofs = proofSnap.docs.map((d) => ({ id: d.id, ...d.data() } as PaymentProofRecord));
+        // Merge with existing demos so demo items remain visible if needed
+        setPaymentProofs(realProofs);
+      }
     } catch (e) {
       console.warn('Admin Firestore fetch note:', e);
+    }
+  };
+
+  // Review Payment Proof: Approve changes user status to 'Premium' and unlocks international features
+  const handleReviewPaymentProof = async (proofId: string, decision: 'approved' | 'rejected') => {
+    const target = paymentProofs.find((p) => p.id === proofId);
+    if (!target) return;
+
+    // Optimistic UI state update
+    setPaymentProofs((prev) =>
+      prev.map((p) =>
+        p.id === proofId
+          ? {
+              ...p,
+              status: decision,
+              reviewedAt: new Date().toISOString(),
+              adminDecisionNotes:
+                decision === 'approved'
+                  ? 'Payment proof verified and approved. Premium activated.'
+                  : 'Payment rejected. Invalid or unverifiable transaction proof.',
+            }
+          : p
+      )
+    );
+
+    try {
+      // 1. Update Payment Proof record in Firestore
+      await updateDoc(doc(db, 'payment_proofs', proofId), {
+        status: decision,
+        reviewedAt: new Date().toISOString(),
+        adminDecisionNotes:
+          decision === 'approved'
+            ? 'Payment proof verified and approved. Premium activated.'
+            : 'Payment rejected. Invalid or unverifiable transaction proof.',
+      });
+
+      if (decision === 'approved') {
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 30);
+
+        // 2. Activate Premium Subscription
+        await setDoc(
+          doc(db, 'subscriptions', target.userId),
+          {
+            userId: target.userId,
+            planId: target.planId,
+            status: 'active',
+            price: target.amountUsd,
+            expiresAt: expires.toISOString(),
+            createdAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+
+        // 3. Update User Document to Premium
+        await setDoc(
+          doc(db, 'users', target.userId),
+          {
+            subscriptionStatus: 'active',
+            isPremium: true,
+            status: 'active',
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } else {
+        await setDoc(
+          doc(db, 'subscriptions', target.userId),
+          {
+            status: 'canceled',
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
+    } catch (err) {
+      console.warn('Persist payment proof review notice:', err);
     }
   };
 
@@ -359,15 +485,24 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Tab Buttons */}
         <div className="flex flex-wrap items-center gap-1.5 p-1 bg-stone-100 rounded-xl">
-          {(['overview', 'verifications', 'moderation', 'appeals', 'pricing', 'promos'] as const).map((tab) => (
+          {(['overview', 'payments', 'verifications', 'moderation', 'appeals', 'pricing', 'promos'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition-colors cursor-pointer ${
-                activeTab === tab ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+                activeTab === tab ? 'bg-white text-stone-900 shadow-xs font-bold' : 'text-stone-600 hover:text-stone-900'
               }`}
             >
-              {tab === 'appeals' ? (
+              {tab === 'payments' ? (
+                <span className="flex items-center gap-1.5">
+                  <span>Pending Payments</span>
+                  {paymentProofs.filter((p) => p.status === 'pending').length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold">
+                      {paymentProofs.filter((p) => p.status === 'pending').length}
+                    </span>
+                  )}
+                </span>
+              ) : tab === 'appeals' ? (
                 <span className="flex items-center gap-1">
                   <span>Appeals</span>
                   {appeals.filter((a) => a.status === 'pending').length > 0 && (
@@ -392,7 +527,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Overview Analytics KPI Cards */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
               <span className="text-[11px] font-bold text-stone-400 uppercase">Verified Adults</span>
               <p className="text-2xl font-serif font-bold text-stone-900 mt-1">2,840</p>
@@ -400,9 +535,17 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
+              <span className="text-[11px] font-bold text-stone-400 uppercase">Pending Payments</span>
+              <p className="text-2xl font-serif font-bold text-rose-600 mt-1">
+                {paymentProofs.filter((p) => p.status === 'pending').length}
+              </p>
+              <span className="text-[10px] text-rose-700 font-semibold">JazzCash & USDT</span>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
               <span className="text-[11px] font-bold text-stone-400 uppercase">Active Daters (24h)</span>
               <p className="text-2xl font-serif font-bold text-stone-900 mt-1">1,215</p>
-              <span className="text-[10px] text-stone-500">Across USA, UK, UAE, EU</span>
+              <span className="text-[10px] text-stone-500">Pakistan & Worldwide</span>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
@@ -410,7 +553,7 @@ export const AdminDashboard: React.FC = () => {
               <p className="text-2xl font-serif font-bold text-amber-600 mt-1">
                 {reports.filter((r) => r.status === 'pending').length}
               </p>
-              <span className="text-[10px] text-amber-700 font-semibold">Zero automated bans</span>
+              <span className="text-[10px] text-amber-700 font-semibold">Automated moderation</span>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
@@ -447,6 +590,168 @@ export const AdminDashboard: React.FC = () => {
                 Prompt response time on identity verifications, user reports, and account appeals.
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Payments Review Table (JazzCash & USDT TRC20 Manual Verification) */}
+      {activeTab === 'payments' && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-stone-200 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200 mb-2">
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>Manual Verification Queue</span>
+              </div>
+              <h3 className="text-xl font-serif font-bold text-stone-900">
+                Pending Payments Review Table
+              </h3>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Review submitted JazzCash and Crypto (USDT TRC20) payment proofs. Clicking Approve immediately grants 'Premium' status and unlocks international connections.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
+                {paymentProofs.filter((p) => p.status === 'pending').length} Pending Review
+              </span>
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+                {paymentProofs.filter((p) => p.status === 'approved').length} Approved
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-stone-50 text-stone-500 uppercase text-[10px] font-bold border-y border-stone-200">
+                <tr>
+                  <th className="p-3">User & Account</th>
+                  <th className="p-3">Method</th>
+                  <th className="p-3">Plan & Dual Fee</th>
+                  <th className="p-3">Transaction ID (TID / TxHash)</th>
+                  <th className="p-3">Sender Detail</th>
+                  <th className="p-3 text-center">Receipt Slip</th>
+                  <th className="p-3">Submitted</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 text-stone-700">
+                {paymentProofs.map((item) => (
+                  <tr key={item.id} className="hover:bg-stone-50/50 transition-colors">
+                    {/* User */}
+                    <td className="p-3">
+                      <div className="font-bold text-stone-900">{item.userName}</div>
+                      <div className="text-[11px] text-stone-500 font-mono">{item.userEmail}</div>
+                      <div className="text-[10px] text-stone-400 mt-0.5">UID: {item.userId.slice(0, 14)}...</div>
+                    </td>
+
+                    {/* Method */}
+                    <td className="p-3">
+                      {item.method === 'JazzCash' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[11px]">
+                          <span>🇵🇰</span>
+                          <span>JazzCash</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[11px]">
+                          <span>₮</span>
+                          <span>USDT (TRC20)</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Plan & Dual Fee */}
+                    <td className="p-3">
+                      <div className="font-semibold text-stone-900">{item.planTitle}</div>
+                      <div className="text-[11px] text-rose-600 font-bold">
+                        {formatDualPrice(item.amountUsd)}
+                      </div>
+                    </td>
+
+                    {/* Transaction ID */}
+                    <td className="p-3 font-mono font-medium text-stone-900">
+                      <div className="max-w-[160px] truncate bg-stone-100 px-2 py-1 rounded-md text-[11px] select-all">
+                        {item.transactionId}
+                      </div>
+                    </td>
+
+                    {/* Sender Detail */}
+                    <td className="p-3 font-mono text-[11px] text-stone-700">
+                      <div className="max-w-[140px] truncate">{item.senderDetail}</div>
+                    </td>
+
+                    {/* Receipt Slip Preview / Link */}
+                    <td className="p-3 text-center">
+                      {item.receiptUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSlipUrl(item.receiptUrl)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 text-[11px] font-semibold transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-stone-500" />
+                          <span>View Slip</span>
+                        </button>
+                      ) : (
+                        <span className="text-stone-400 text-[11px]">No Slip</span>
+                      )}
+                    </td>
+
+                    {/* Submitted At */}
+                    <td className="p-3 text-[11px] text-stone-500 whitespace-nowrap">
+                      {new Date(item.submittedAt).toLocaleDateString()} {new Date(item.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+
+                    {/* Status */}
+                    <td className="p-3">
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                          item.status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : item.status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800 animate-pulse'
+                        }`}
+                      >
+                        {item.status === 'pending' ? 'Pending Verification' : item.status}
+                      </span>
+                    </td>
+
+                    {/* Actions: Approve / Reject */}
+                    <td className="p-3 text-right">
+                      {item.status === 'pending' ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleReviewPaymentProof(item.id, 'approved')}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                            title="Approve and activate Premium membership"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Approve</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReviewPaymentProof(item.id, 'rejected')}
+                            className="px-3 py-1.5 bg-stone-100 hover:bg-rose-50 text-stone-700 hover:text-rose-700 border border-stone-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                            title="Reject payment proof"
+                          >
+                            <span>Reject</span>
+                          </button>
+                        </div>
+                      ) : item.status === 'approved' ? (
+                        <div className="flex items-center justify-end gap-1 text-emerald-600 font-bold text-xs">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Premium Active</span>
+                        </div>
+                      ) : (
+                        <span className="text-stone-400 text-xs">Rejected</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -843,6 +1148,47 @@ export const AdminDashboard: React.FC = () => {
                 <p className="text-[11px] text-stone-400">{p.uses} Redemptions · Active</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Payment Receipt Fullscreen Modal */}
+      {selectedSlipUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 text-left relative shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-stone-900">
+                  Payment Receipt Slip
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Transaction slip submitted by member for manual audit
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedSlipUrl(null)}
+                className="p-1.5 text-stone-400 hover:text-stone-900 rounded-full hover:bg-stone-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-[65vh] overflow-auto rounded-2xl border border-stone-200 bg-stone-50 flex items-center justify-center p-2">
+              <img
+                src={selectedSlipUrl}
+                alt="Receipt Slip Proof"
+                className="max-h-[60vh] w-auto object-contain rounded-xl"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setSelectedSlipUrl(null)}
+                className="px-5 py-2.5 bg-stone-900 hover:bg-black text-white text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

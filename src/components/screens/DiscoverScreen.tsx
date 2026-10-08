@@ -25,6 +25,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMatch } from '../../contexts/MatchContext';
 import { UserProfile } from '../../types';
 import { DiscoveryExplorer } from '../discovery/DiscoveryExplorer';
+import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
 
 interface DiscoverScreenProps {
   onNavigate: (screen: string, extraData?: any) => void;
@@ -35,7 +36,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
   onNavigate,
   onOpenProfileDetails,
 }) => {
-  const { userProfile } = useAuth();
+  const { userProfile, isPakistanUser, isPremium } = useAuth();
   const {
     currentCard,
     swipe,
@@ -55,6 +56,10 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
   const [photoIndex, setPhotoIndex] = useState(0);
   const [swipingDirection, setSwipingDirection] = useState<'left' | 'right' | 'up' | null>(null);
 
+  // International upgrade modal in swipe mode
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeCardTarget, setUpgradeCardTarget] = useState<UserProfile | null>(null);
+
   const photos = currentCard?.photos && currentCard.photos.length > 0
     ? currentCard.photos
     : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'];
@@ -70,12 +75,31 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
   };
 
   const handleSwipeAction = async (action: 'like' | 'pass' | 'superlike') => {
+    if (action !== 'pass' && currentCard && currentCard.country && currentCard.country.toLowerCase() !== 'pakistan') {
+      if (isPakistanUser && !isPremium) {
+        setUpgradeCardTarget(currentCard);
+        setUpgradeModalOpen(true);
+        return;
+      }
+    }
+
     setSwipingDirection(action === 'like' ? 'right' : action === 'pass' ? 'left' : 'up');
     setTimeout(async () => {
       await swipe(action);
       setSwipingDirection(null);
       setPhotoIndex(0);
     }, 280);
+  };
+
+  const handleOpenCardDetails = (profile: UserProfile) => {
+    if (profile.country && profile.country.toLowerCase() !== 'pakistan') {
+      if (isPakistanUser && !isPremium) {
+        setUpgradeCardTarget(profile);
+        setUpgradeModalOpen(true);
+        return;
+      }
+    }
+    onOpenProfileDetails(profile);
   };
 
   return (
@@ -154,6 +178,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
             }
           }}
           onNavigateToPreferences={() => onNavigate('dating_preferences')}
+          onNavigateToPremium={() => onNavigate('premium_plans')}
         />
       ) : (
         /* Mode 2: Classic Card Stack Swipe Deck */
@@ -173,7 +198,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
               {/* Photos Container */}
               <div
                 className="relative h-[490px] sm:h-[530px] w-full bg-stone-900 cursor-pointer group"
-                onClick={() => onOpenProfileDetails(currentCard)}
+                onClick={() => handleOpenCardDetails(currentCard)}
               >
                 <img
                   src={photos[photoIndex]}
@@ -422,6 +447,22 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
           </div>
         </div>
       )}
+
+      {/* International Upgrade Modal for Card Deck Mode */}
+      <InternationalUpgradeModal
+        isOpen={upgradeModalOpen}
+        targetCountry={upgradeCardTarget?.country}
+        targetProfileName={upgradeCardTarget?.name}
+        onClose={() => setUpgradeModalOpen(false)}
+        onUpgrade={() => {
+          setUpgradeModalOpen(false);
+          onNavigate('premium_plans');
+        }}
+        onExplorePakistan={() => {
+          setUpgradeModalOpen(false);
+          setViewMode('explore');
+        }}
+      />
     </div>
   );
 };

@@ -15,11 +15,17 @@ import {
   X,
   MapPin,
   Flag,
+  Mic,
+  Square,
+  Play,
+  Pause,
+  Volume2,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChat } from '../../contexts/ChatContext';
 import { MatchRecord, UserProfile, AICompatibilityResponse } from '../../types';
 import { geminiService } from '../../services/geminiService';
+import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
 
 interface ChatViewProps {
   match: MatchRecord;
@@ -30,20 +36,23 @@ interface ChatViewProps {
     extra?: { messageId?: string; messageText?: string }
   ) => void;
   onCloseMobileChat?: () => void;
+  onNavigate?: (screen: string) => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
   match,
   onOpenSafetyModal,
   onCloseMobileChat,
+  onNavigate,
 }) => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, isPakistanUser, isPremium } = useAuth();
   const {
     messages,
     isTyping,
     sendingMessage,
     moderationWarning,
     sendMessage,
+    sendVoiceNote,
     deleteMessage,
     dismissWarning,
   } = useChat();
@@ -52,6 +61,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [imageUrlInput, setImageUrlInput] = useState<string>('');
   const [showImageInput, setShowImageInput] = useState<boolean>(false);
   const [showMenu, setShowMenu] = useState<boolean>(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState<boolean>(false);
+
+  // Voice Note Recording state
+  const [isRecordingVoice, setIsRecordingVoice] = useState<boolean>(false);
+  const [recordSeconds, setRecordSeconds] = useState<number>(0);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const recordTimerRef = useRef<any>(null);
 
   // AI Modal States
   const [startersList, setStartersList] = useState<string[]>([]);
@@ -70,8 +86,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     age: 26,
     gender: 'woman',
     interestedIn: 'everyone',
-    city: 'New York',
-    country: 'USA',
+    city: 'Lahore',
+    country: 'Pakistan',
     bio: '',
     photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'],
     interests: ['Travel', 'Art'],
@@ -82,8 +98,70 @@ export const ChatView: React.FC<ChatViewProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    if (isRecordingVoice) {
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => {
+        setRecordSeconds((s) => s + 1);
+      }, 1000);
+    } else {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    }
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    };
+  }, [isRecordingVoice]);
+
+  const handleStartVoiceRecording = () => {
+    setIsRecordingVoice(true);
+  };
+
+  const handleCancelVoiceRecording = () => {
+    setIsRecordingVoice(false);
+    setRecordSeconds(0);
+  };
+
+  const isOtherInternational =
+    otherProfile.country &&
+    otherProfile.country.toLowerCase() !== 'pakistan';
+
+  const handleSendVoiceRecording = async () => {
+    if (isPakistanUser && !isPremium && isOtherInternational) {
+      setUpgradeModalOpen(true);
+      setIsRecordingVoice(false);
+      setRecordSeconds(0);
+      return;
+    }
+
+    const finalSeconds = Math.max(1, recordSeconds);
+    const mins = Math.floor(finalSeconds / 60);
+    const secs = (finalSeconds % 60).toString().padStart(2, '0');
+    const durationLabel = `${mins}:${secs}`;
+    setIsRecordingVoice(false);
+    setRecordSeconds(0);
+
+    // Audio URL placeholder for high-quality audio voice note representation
+    const sampleVoiceUrl = 'https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg';
+    await sendVoiceNote(sampleVoiceUrl, durationLabel);
+  };
+
+  const togglePlayVoice = (msgId: string) => {
+    if (playingVoiceId === msgId) {
+      setPlayingVoiceId(null);
+    } else {
+      setPlayingVoiceId(msgId);
+      setTimeout(() => {
+        setPlayingVoiceId(null);
+      }, 5000);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPakistanUser && !isPremium && isOtherInternational) {
+      setUpgradeModalOpen(true);
+      return;
+    }
     if (!inputVal.trim() && !imageUrlInput.trim()) return;
 
     const success = await sendMessage(inputVal, imageUrlInput || undefined);
@@ -242,14 +320,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
       </div>
 
+      {/* Pakistan Free Access Banner */}
+      {isPakistanUser && (
+        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-1.5 flex items-center justify-between text-[11px] text-emerald-800">
+          <div className="flex items-center gap-1.5 font-medium">
+            <span>🇵🇰</span>
+            <span><strong>Pakistan 100% Free Access:</strong> Unlimited messaging & voice notes without paywall.</span>
+          </div>
+        </div>
+      )}
+
       {/* Safety Moderation Warning Banner */}
       {moderationWarning && (
-        <div className="bg-rose-50 border-b border-rose-200 px-4 py-2 flex items-center justify-between text-xs text-rose-700 animate-in slide-in-from-top-1">
+        <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between text-xs text-rose-800 font-medium animate-in slide-in-from-top-1 shadow-xs">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{moderationWarning}</span>
+            <span className="leading-snug">{moderationWarning}</span>
           </div>
-          <button onClick={dismissWarning} className="text-rose-500 hover:text-rose-800">
+          <button onClick={dismissWarning} className="text-rose-500 hover:text-rose-800 p-1">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -311,6 +399,49 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       alt="Shared media"
                       className="w-full max-h-60 object-cover"
                     />
+                  </div>
+                )}
+
+                {/* Voice Note message */}
+                {msg.voiceNoteUrl && (
+                  <div className="flex items-center gap-2.5 py-1 px-1 min-w-[200px]">
+                    <button
+                      type="button"
+                      onClick={() => togglePlayVoice(msg.id)}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer shadow-xs ${
+                        isMe
+                          ? 'bg-white text-rose-600 hover:bg-rose-50'
+                          : 'bg-rose-600 text-white hover:bg-rose-700'
+                      }`}
+                    >
+                      {playingVoiceId === msg.id ? (
+                        <Pause className="w-4 h-4 fill-current" />
+                      ) : (
+                        <Play className="w-4 h-4 fill-current ml-0.5" />
+                      )}
+                    </button>
+
+                    <div className="flex-1 flex items-center gap-0.5">
+                      {[40, 70, 30, 90, 60, 40, 80, 50, 70, 30, 60, 85, 45, 65, 35].map((height, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-1 rounded-full transition-all duration-200 ${
+                            playingVoiceId === msg.id
+                              ? isMe ? 'bg-white' : 'bg-rose-600'
+                              : isMe ? 'bg-white/60' : 'bg-stone-300'
+                          }`}
+                          style={{
+                            height: playingVoiceId === msg.id && idx % 2 === 0
+                              ? `${Math.max(8, height / 3.5)}px`
+                              : `${Math.max(4, height / 5)}px`
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    <span className={`text-[10px] font-mono font-medium ${isMe ? 'text-rose-100' : 'text-stone-500'}`}>
+                      {msg.voiceDuration || '0:15'}
+                    </span>
                   </div>
                 )}
 
@@ -416,33 +547,79 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
       )}
 
-      {/* Chat Input Bar */}
-      <form onSubmit={handleSend} className="p-3 bg-white border-t border-stone-200 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setShowImageInput(!showImageInput)}
-          title="Share photo"
-          className="p-2 text-stone-500 hover:text-rose-600 rounded-lg hover:bg-stone-100 transition-colors"
-        >
-          <ImageIcon className="w-5 h-5" />
-        </button>
+      {/* Voice Note Recording Bar */}
+      {isRecordingVoice ? (
+        <div className="p-3 bg-rose-50/90 border-t border-rose-200 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-2.5">
+            <span className="w-3 h-3 rounded-full bg-rose-600 animate-ping shrink-0" />
+            <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-rose-700">
+              <Mic className="w-4 h-4 text-rose-600 animate-pulse" />
+              <span>
+                {Math.floor(recordSeconds / 60)}:{(recordSeconds % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+            <span className="text-[11px] text-rose-600/80 font-medium hidden sm:inline">
+              (100% Free Voice Note)
+            </span>
+          </div>
 
-        <input
-          type="text"
-          placeholder={`Message ${otherProfile.name}...`}
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
-          className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white transition-all"
-        />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCancelVoiceRecording}
+              className="px-3 py-1.5 bg-white border border-stone-200 text-stone-600 hover:text-stone-900 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSendVoiceRecording}
+              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Send Voice Note</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Standard Chat Input Bar */
+        <form onSubmit={handleSend} className="p-3 bg-white border-t border-stone-200 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowImageInput(!showImageInput)}
+            title="Share photo"
+            className="p-2 text-stone-500 hover:text-rose-600 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer"
+          >
+            <ImageIcon className="w-5 h-5" />
+          </button>
 
-        <button
-          type="submit"
-          disabled={sendingMessage || (!inputVal.trim() && !imageUrlInput.trim())}
-          className="p-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors disabled:opacity-40"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </form>
+          {/* Voice Note Mic Button (100% Free) */}
+          <button
+            type="button"
+            onClick={handleStartVoiceRecording}
+            title="Record Voice Note (100% Free)"
+            className="p-2 text-stone-500 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+          >
+            <Mic className="w-5 h-5" />
+          </button>
+
+          <input
+            type="text"
+            placeholder={`Message ${otherProfile.name}...`}
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white transition-all"
+          />
+
+          <button
+            type="submit"
+            disabled={sendingMessage || (!inputVal.trim() && !imageUrlInput.trim())}
+            className="p-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors disabled:opacity-40 cursor-pointer"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </form>
+      )}
 
       {/* AI Conversation Starters Modal */}
       {showStartersModal && (
@@ -550,6 +727,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* International Upgrade Modal */}
+      <InternationalUpgradeModal
+        isOpen={upgradeModalOpen}
+        targetCountry={otherProfile.country}
+        targetProfileName={otherProfile.name}
+        onClose={() => setUpgradeModalOpen(false)}
+        onUpgrade={() => {
+          setUpgradeModalOpen(false);
+          onNavigate?.('premium_plans');
+        }}
+      />
     </div>
   );
 };

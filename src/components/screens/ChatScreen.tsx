@@ -45,6 +45,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           match={currentMatch}
           onOpenSafetyModal={onOpenSafetyModal}
           onCloseMobileChat={() => onNavigate('matches')}
+          onNavigate={onNavigate}
         />
       </div>
     </div>

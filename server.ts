@@ -329,12 +329,12 @@ app.post('/api/gemini/moderate-message', async (req: Request, res: Response) => 
     }
 
     if (!geminiApiKey) {
-      // Deterministic fallback detection
-      const spamRegex = /\b(free money|gift card|bit-invest|whatsapp me|telegram me|cashapp|click here|onlyfans)\b/i;
-      const scamRegex = /\b(crypto investment|wire transfer|western union|send money|forex signals)\b/i;
-      const harassmentRegex = /\b(die|ugly|threat|kill|harass|hate you|stalk)\b/i;
-      const explicitRegex = /\b(send nudes|escort service|prostitute|pay for sex)\b/i;
-      const underageRegex = /\b(i am 15|i am 16|i am 17|turning 16|high school sophomore)\b/i;
+      // Deterministic fallback detection (including Urdu, Roman Urdu, and spam link filters)
+      const spamRegex = /\b(free money|gift card|bit-invest|whatsapp me|telegram me|cashapp|click here|onlyfans|wa\.me|t\.me)\b|https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|net|xyz|club|org)\b/i;
+      const scamRegex = /\b(crypto investment|wire transfer|western union|send money|forex signals|send money to my account)\b/i;
+      const harassmentRegex = /\b(die|ugly|threat|kill|harass|hate you|stalk|kutta|kutti|kutte|harami|kanjar|chutiya|bhenchod|madarchod|gandu|dalaal|kaminey|ullu ke pathe|haramzada|bhosdike|loda|lauda|randi|gashti)\b|[\u0600-\u06FF\u0750-\u077F]/i;
+      const explicitRegex = /\b(send nudes|escort service|prostitute|pay for sex|pussy|dick|bitch|bastard|slut|whore|cunt)\b/i;
+      const underageRegex = /\b(i am 15|i am 16|i am 17|turning 16|high school sophomore|im 14|im 15|im 16|im 17)\b/i;
 
       let category = 'safe';
       let reason: string | null = null;

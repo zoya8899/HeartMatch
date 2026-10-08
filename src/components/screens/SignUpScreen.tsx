@@ -16,6 +16,8 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
   const [age, setAge] = useState<number>(25);
   const [gender, setGender] = useState<Gender>('woman');
   const [interestedIn, setInterestedIn] = useState<InterestedIn>('men');
+  const [country, setCountry] = useState<string>('Pakistan');
+  const [city, setCity] = useState<string>('Lahore');
   const [agreed18, setAgreed18] = useState<boolean>(false);
   const [agreedSafety, setAgreedSafety] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
@@ -37,9 +39,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
 
     setLoading(true);
     try {
-      await signupWithEmail(email, password, name, age, gender, interestedIn);
+      await signupWithEmail(email, password, name, age, gender, interestedIn, country, city);
       setLoading(false);
-      onNavigate('age_verification');
+      onNavigate('create_profile');
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please check your information.');
       setLoading(false);
@@ -166,12 +168,45 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
             <select
               value={interestedIn}
               onChange={(e) => setInterestedIn(e.target.value as InterestedIn)}
-              className="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-xs focus:ring-rose-500 focus:border-rose-500"
+              className="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-xs focus:ring-rose-500 focus:border-rose-500 bg-white"
             >
               <option value="men">Men</option>
               <option value="women">Women</option>
               <option value="everyone">Everyone</option>
             </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-stone-700 mb-1">Country</label>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-xs focus:ring-rose-500 focus:border-rose-500 bg-white"
+              >
+                <option value="Pakistan">🇵🇰 Pakistan (100% Free Access)</option>
+                <option value="United States">🇺🇸 United States</option>
+                <option value="United Kingdom">🇬🇧 United Kingdom</option>
+                <option value="Canada">🇨🇦 Canada</option>
+                <option value="Australia">🇦🇺 Australia</option>
+                <option value="United Arab Emirates">🇦🇪 United Arab Emirates</option>
+                <option value="Germany">🇩🇪 Germany</option>
+                <option value="France">🇫🇷 France</option>
+                <option value="Other">🌍 Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-700 mb-1">City</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Lahore, Karachi, Islamabad"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full border border-stone-300 rounded-xl px-3 py-2.5 text-xs focus:ring-rose-500 focus:border-rose-500 bg-white"
+              />
+            </div>
           </div>
 
           <div>

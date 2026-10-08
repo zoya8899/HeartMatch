@@ -15,6 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { DEFAULT_PRODUCTS } from '../../services/seedData';
+import { SignUpGuideVideoBanner } from './SignUpGuideVideoBanner';
 
 interface LandingPageProps {
   onOpenAuth: (mode: 'login' | 'signup') => void;
@@ -131,6 +132,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Dedicated "How It Works: 30-sec Sign Up Guide" Video Banner */}
+          <div className="mt-12 lg:mt-16">
+            <SignUpGuideVideoBanner onOpenAuth={(mode) => onOpenAuth(mode)} />
           </div>
         </div>
       </section>

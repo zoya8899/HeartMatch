@@ -20,12 +20,12 @@ interface LikesScreenProps {
 }
 
 export const LikesScreen: React.FC<LikesScreenProps> = ({ onNavigate, onOpenProfile }) => {
-  const { subscription } = useAuth();
+  const { subscription, isPakistanUser } = useAuth();
   const { swipeProfile } = useMatch();
 
   const [activeSubTab, setActiveSubTab] = useState<'received' | 'sent'>('received');
 
-  const isPremium = subscription?.status === 'active';
+  const isPremium = (subscription?.status === 'active') || isPakistanUser;
 
   // Sample incoming likes
   const incomingLikesProfiles = INITIAL_DISCOVERY_PROFILES.slice(0, 4);
@@ -79,6 +79,24 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ onNavigate, onOpenProf
           </button>
         </div>
       </div>
+
+      {/* Pakistan 100% Free Access Banner */}
+      {isPakistanUser && activeSubTab === 'received' && (
+        <div className="bg-gradient-to-r from-emerald-700 to-teal-800 rounded-3xl p-6 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🇵🇰</span>
+              <h3 className="text-base font-serif font-bold">100% Free Pakistan Access Enabled</h3>
+            </div>
+            <p className="text-xs text-emerald-100 leading-relaxed max-w-xl">
+              As a single in Pakistan, you have full unlimited access to see admirers, instant match, unlimited messaging, and voice notes with zero fees!
+            </p>
+          </div>
+          <span className="px-3.5 py-1.5 bg-white/20 text-white font-semibold text-xs rounded-xl backdrop-blur shrink-0">
+            Unlimited Free
+          </span>
+        </div>
+      )}
 
       {/* Non-Premium Promotion Banner */}
       {!isPremium && activeSubTab === 'received' && (

@@ -27,7 +27,9 @@ import {
   UserPreference,
   SubscriptionRecord,
   SubscriptionPlanId,
+  PaymentProofRecord,
 } from '../types';
+import { checkContentForAbuse } from '../services/moderationFilter';
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -36,12 +38,15 @@ interface AuthContextType {
   userPreference: UserPreference | null;
   subscription: SubscriptionRecord | null;
   isAdmin: boolean;
+  isPakistanUser: boolean;
+  isPremium: boolean;
+  strikeCount: number;
   loading: boolean;
   superLikesCount: number;
   boostsCount: number;
   rewindsCount: number;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  signupWithEmail: (email: string, pass: string, name: string, age: number, gender: UserProfile['gender'], interestedIn: UserProfile['interestedIn']) => Promise<void>;
+  signupWithEmail: (email: string, pass: string, name: string, age: number, gender: UserProfile['gender'], interestedIn: UserProfile['interestedIn'], country?: string, city?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -51,8 +56,19 @@ interface AuthContextType {
   updatePreferenceData: (data: Partial<UserPreference>) => Promise<void>;
   submitAgeVerification: (docType: string, idUrl?: string, selfieUrl?: string) => Promise<void>;
   activateSubscription: (planId: SubscriptionPlanId, price: number) => Promise<void>;
+  submitPaymentProof: (proof: {
+    planId: string;
+    planTitle: string;
+    amountUsd: number;
+    amountPkr: number;
+    method: 'JazzCash' | 'USDT';
+    transactionId: string;
+    senderDetail: string;
+    receiptUrl: string;
+  }) => Promise<PaymentProofRecord>;
   useConsumable: (type: 'superlike' | 'boost' | 'rewind') => boolean;
   addConsumable: (type: 'superlike' | 'boost' | 'spotlight' | 'rewind', amount: number) => void;
+  recordStrike: (reason: string, offendingSnippet?: string) => Promise<{ strikeCount: number; isSuspended: boolean }>;
   deleteAccount: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -71,10 +87,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Pakistan Free Access Check
+  const isPakistanUser =
+    userProfile?.country?.toLowerCase() === 'pakistan' ||
+    userAccount?.isPakistanFreeAccess === true;
+
+  // Active Premium Status Check
+  const isPremium =
+    subscription?.status === 'active' &&
+    new Date(subscription.expiresAt).getTime() > Date.now();
+
+  // Strikes tracked from userAccount or default 0
+  const strikeCount = userAccount?.strikeCount || 0;
+
   // Consumables state
-  const [superLikesCount, setSuperLikesCount] = useState<number>(3);
-  const [boostsCount, setBoostsCount] = useState<number>(1);
-  const [rewindsCount, setRewindsCount] = useState<number>(5);
+  const [superLikesCount, setSuperLikesCount] = useState<number>(10);
+  const [boostsCount, setBoostsCount] = useState<number>(3);
+  const [rewindsCount, setRewindsCount] = useState<number>(10);
 
   const fetchUserData = async (user: FirebaseUser) => {
     try {
@@ -195,7 +224,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     name: string,
     age: number,
     gender: UserProfile['gender'],
-    interestedIn: UserProfile['interestedIn']
+    interestedIn: UserProfile['interestedIn'],
+    userCountry: string = 'Pakistan',
+    userCity: string = 'Lahore'
   ) => {
     if (age < 18) {
       throw new Error('HeartMatch is strictly for adults aged 18 and older.');
@@ -213,39 +244,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const isUserAdmin = email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
+      const isPak = userCountry.toLowerCase() === 'pakistan';
 
-      // Create User doc
+      // Create User doc with Instant Auto-Approval (status: 'active')
       const newAccount: UserAccount = {
         uid,
         email,
         role: isUserAdmin ? 'admin' : 'user',
-        ageVerified: true, // initial self-attested 18+ declaration
-        status: 'active',
+        ageVerified: true, // certified 18+
+        status: 'active', // Auto-approved immediately!
+        strikeCount: 0,
+        isPakistanFreeAccess: isPak,
         createdAt: new Date().toISOString(),
       };
       await setDoc(doc(db, 'users', uid), newAccount);
 
-      // Create Profile doc
+      // Create Profile doc with instant verified approval and public discovery
       const newProfile: UserProfile = {
         userId: uid,
         name,
         age,
         gender,
         interestedIn,
-        city: 'New York',
-        country: 'United States',
-        bio: `Hello! I'm ${name}. Passionate about exploring new places, meaningful conversations, and building authentic connections.`,
+        city: userCity || (isPak ? 'Lahore' : 'New York'),
+        country: userCountry || (isPak ? 'Pakistan' : 'United States'),
+        bio: `Hello! I'm ${name}. Excited to meet genuine, kind people and build meaningful connections.`,
         photos: [
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+          'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80'
         ],
-        interests: ['Travel', 'Specialty Coffee', 'Music', 'Fitness'],
+        interests: ['Specialty Coffee', 'Music', 'Travel', 'Art', 'Fitness'],
         hobbies: ['Weekend Roadtrips', 'Reading', 'Photography'],
         profession: 'Professional',
         education: 'University Graduate',
         relationshipGoal: 'long-term',
-        completionPercentage: 70,
-        verified: false,
+        completionPercentage: 80,
+        verified: true, // Auto-approved!
+        verificationStatus: 'verified', // Auto-approved!
+        profileVerified: true,
+        optedIntoDiscovery: true, // Immediately discoverable publicly!
         isIncognito: false,
+        registeredAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await setDoc(doc(db, 'profiles', uid), newProfile);
@@ -282,15 +322,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profileSnap = await getDoc(profileRef);
 
       if (!profileSnap.exists()) {
-        // Create initial default profile for Google user (subject to age completion)
+        // Create initial default auto-approved profile for Google user
         const initialProfile: UserProfile = {
           userId: user.uid,
           name: user.displayName || 'Member',
           age: 24, // default adult baseline
           gender: 'other',
           interestedIn: 'everyone',
-          city: 'London',
-          country: 'United Kingdom',
+          city: 'Lahore',
+          country: 'Pakistan',
           bio: 'Looking for meaningful conversations, shared adventures, and genuine people.',
           photos: [
             user.photoURL ||
@@ -299,13 +339,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           interests: ['Art', 'Culinary', 'Travel', 'Wellness'],
           hobbies: ['Music', 'Hiking'],
           relationshipGoal: 'long-term',
-          completionPercentage: 75,
-          verified: false,
+          completionPercentage: 85,
+          verified: true, // Instant auto-approval!
+          verificationStatus: 'verified',
+          profileVerified: true,
+          optedIntoDiscovery: true, // Immediately public!
           isIncognito: false,
+          registeredAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
         await setDoc(profileRef, initialProfile);
         setUserProfile(initialProfile);
+
+        const newAccount: UserAccount = {
+          uid: user.uid,
+          email: user.email || '',
+          role: user.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user',
+          ageVerified: true,
+          status: 'active',
+          strikeCount: 0,
+          isPakistanFreeAccess: true,
+          createdAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, 'users', user.uid), newAccount);
+        setUserAccount(newAccount);
       }
 
       await fetchUserData(user);
@@ -349,11 +407,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const recordStrike = async (
+    reason: string,
+    offendingSnippet?: string
+  ): Promise<{ strikeCount: number; isSuspended: boolean }> => {
+    if (!currentUser) return { strikeCount: 0, isSuspended: false };
+
+    const currentStrikes = userAccount?.strikeCount || 0;
+    const nextStrikes = currentStrikes + 1;
+
+    if (nextStrikes >= 2) {
+      // Strike 2: Automatically disable/block user's account and log them out
+      const suspensionReason =
+        'Account permanently suspended and disabled due to repeated violations of Trust & Safety guidelines (offensive language or spam abuse). Strike 2 enforcement.';
+      try {
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          strikeCount: 2,
+          status: 'suspended',
+          suspendedReason: suspensionReason,
+          suspendedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error('Error recording strike 2 to Firestore:', err);
+      }
+
+      if (userAccount) {
+        setUserAccount({
+          ...userAccount,
+          strikeCount: 2,
+          status: 'suspended',
+          suspendedReason: suspensionReason,
+          suspendedAt: new Date().toISOString(),
+        });
+      }
+
+      // Log out user immediately
+      await logout();
+      return { strikeCount: 2, isSuspended: true };
+    } else {
+      // Strike 1: Record warning and update Firestore
+      try {
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          strikeCount: 1,
+          lastStrikeAt: new Date().toISOString(),
+          strike1Reason: reason,
+        });
+      } catch (err) {
+        console.error('Error recording strike 1 to Firestore:', err);
+      }
+
+      if (userAccount) {
+        setUserAccount({
+          ...userAccount,
+          strikeCount: 1,
+          lastStrikeAt: new Date().toISOString(),
+          strike1Reason: reason,
+        });
+      }
+
+      return { strikeCount: 1, isSuspended: false };
+    }
+  };
+
   const updateProfileData = async (data: Partial<UserProfile>) => {
     if (!currentUser || !userProfile) return;
 
     if (data.age !== undefined && data.age < 18) {
       throw new Error('Age must be 18 or older to maintain membership.');
+    }
+
+    // Two-Strike automated abuse filter on profile bio
+    if (data.bio && typeof data.bio === 'string') {
+      const abuseCheck = checkContentForAbuse(data.bio);
+      if (abuseCheck.isOffensive) {
+        const { isSuspended } = await recordStrike(
+          abuseCheck.reason || 'Offensive language or spam in profile bio',
+          data.bio
+        );
+        if (isSuspended) {
+          throw new Error('Your account has been disabled and blocked due to repeated policy violations (Strike 2).');
+        } else {
+          throw new Error('Warning: Abuse and inappropriate content are strictly prohibited. Further violations will result in an immediate account ban.');
+        }
+      }
     }
 
     try {
@@ -369,10 +505,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (merged.relationshipGoal) score += 5;
       merged.completionPercentage = Math.min(100, score);
       merged.updatedAt = new Date().toISOString();
+      merged.verified = true; // Instant auto-approval
+      merged.verificationStatus = 'verified'; // Instant auto-approval
+      merged.optedIntoDiscovery = true;
 
       await setDoc(doc(db, 'profiles', currentUser.uid), merged, { merge: true });
       setUserProfile(merged);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message?.includes('Warning:') || err.message?.includes('disabled and blocked')) {
+        throw err;
+      }
       handleFirestoreError(err, OperationType.UPDATE, `profiles/${currentUser.uid}`);
     }
   };
@@ -400,15 +542,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         docType,
         idDocUrl: idUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=400&q=80',
         selfieUrl: selfieUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        status: 'pending',
+        status: 'approved', // Instant auto-approved!
         createdAt: new Date().toISOString(),
       });
 
-      // Update user account
+      // Update user account and profile to active & verified immediately
       if (userAccount) {
-        const updated = { ...userAccount, ageVerified: true };
-        await updateDoc(doc(db, 'users', currentUser.uid), { ageVerified: true });
+        const updated = { ...userAccount, ageVerified: true, status: 'active' as const };
+        await updateDoc(doc(db, 'users', currentUser.uid), { ageVerified: true, status: 'active' });
         setUserAccount(updated);
+      }
+
+      if (userProfile) {
+        const updatedProfile = { ...userProfile, verified: true, verificationStatus: 'verified' as const, optedIntoDiscovery: true };
+        await setDoc(doc(db, 'profiles', currentUser.uid), updatedProfile, { merge: true });
+        setUserProfile(updatedProfile);
       }
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'verification');
@@ -461,7 +609,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const submitPaymentProof = async (proof: {
+    planId: string;
+    planTitle: string;
+    amountUsd: number;
+    amountPkr: number;
+    method: 'JazzCash' | 'USDT';
+    transactionId: string;
+    senderDetail: string;
+    receiptUrl: string;
+  }): Promise<PaymentProofRecord> => {
+    if (!currentUser) throw new Error('You must be signed in to submit payment proof.');
+    const proofId = `proof_${currentUser.uid}_${Date.now()}`;
+    const record: PaymentProofRecord = {
+      id: proofId,
+      userId: currentUser.uid,
+      userEmail: currentUser.email || userAccount?.email || 'member@heartmatch.app',
+      userName: userProfile?.name || 'HeartMatch Member',
+      ...proof,
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+    };
+
+    try {
+      await setDoc(doc(db, 'payment_proofs', proofId), record);
+
+      // Set subscription status to 'pending_verification'
+      const pendingSub: SubscriptionRecord = {
+        userId: currentUser.uid,
+        planId: proof.planId as SubscriptionPlanId,
+        status: 'pending_verification',
+        price: proof.amountUsd,
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'subscriptions', currentUser.uid), pendingSub, { merge: true });
+      setSubscription(pendingSub);
+    } catch (err) {
+      console.warn('Saved payment proof locally / fallback:', err);
+      // Still set subscription status in state
+      setSubscription({
+        userId: currentUser.uid,
+        planId: proof.planId as SubscriptionPlanId,
+        status: 'pending_verification',
+        price: proof.amountUsd,
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    return record;
+  };
+
   const useConsumable = (type: 'superlike' | 'boost' | 'rewind'): boolean => {
+    // 100% FREE UNLIMITED ACCESS FOR ALL PAKISTAN USERS:
+    // messaging, voice notes, browsing, connecting, rewinds, superlikes, and boosts with zero paywall
+    if (isPakistanUser) {
+      return true;
+    }
+
     const isSubActive =
       subscription?.status === 'active' &&
       new Date(subscription.expiresAt).getTime() > Date.now();
@@ -532,6 +738,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userPreference,
         subscription,
         isAdmin,
+        isPakistanUser,
+        isPremium,
+        strikeCount,
         loading,
         superLikesCount,
         boostsCount,
@@ -547,8 +756,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatePreferenceData,
         submitAgeVerification,
         activateSubscription,
+        submitPaymentProof,
         useConsumable,
         addConsumable,
+        recordStrike,
         deleteAccount,
         refreshProfile,
       }}
