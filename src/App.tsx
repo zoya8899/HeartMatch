@@ -51,6 +51,17 @@ function AppContent() {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<'profile' | 'photos'>('profile');
 
+  // Persistent User Session:
+  // Automatically redirect logged-in users straight to the main feed / dashboard on app load or page refresh.
+  // DO NOT show the landing page or "Apply for Membership / Member Sign In" buttons to authenticated users.
+  useEffect(() => {
+    if (!loading && currentUser) {
+      if (currentScreen === 'landing' || currentScreen === 'login' || currentScreen === 'signup') {
+        setCurrentScreen('discover');
+      }
+    }
+  }, [loading, currentUser, currentScreen]);
+
   // Mandatory Onboarding: If real logged in user hasn't set up their real photo/profile, prompt them immediately!
   useEffect(() => {
     if (currentUser && userProfile) {
@@ -104,11 +115,16 @@ function AppContent() {
     setSafetyModalOpen(true);
   };
 
+  // Prevent authenticated users from seeing landing or auth screens
+  const effectiveScreen = currentUser && (currentScreen === 'landing' || currentScreen === 'login' || currentScreen === 'signup')
+    ? 'discover'
+    : currentScreen;
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans selection:bg-rose-100 selection:text-rose-900 flex flex-col">
       {/* Top Navbar */}
       <Navbar
-        currentScreen={currentScreen}
+        currentScreen={effectiveScreen}
         onNavigate={navigateTo}
         openNotifications={() => setNotificationsOpen(true)}
         onOpenProfileModal={(tab) => {
@@ -120,16 +136,16 @@ function AppContent() {
       {/* Main Content Router rendering the 20 requested screens */}
       <main className="flex-1">
         {/* Screen 1: Landing Page */}
-        {currentScreen === 'landing' && <LandingScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'landing' && <LandingScreen onNavigate={navigateTo} />}
 
         {/* Screen 2: Sign Up */}
-        {currentScreen === 'signup' && <SignUpScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'signup' && <SignUpScreen onNavigate={navigateTo} />}
 
         {/* Screen 3: Login */}
-        {currentScreen === 'login' && <LoginScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'login' && <LoginScreen onNavigate={navigateTo} />}
 
         {/* Screen 4: Age Verification */}
-        {currentScreen === 'age_verification' && <AgeVerificationScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'age_verification' && <AgeVerificationScreen onNavigate={navigateTo} />}
 
         {/* Screen 5: Create Profile */}
         {currentScreen === 'create_profile' && <CreateProfileScreen onNavigate={navigateTo} />}

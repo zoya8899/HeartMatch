@@ -18,12 +18,24 @@ import {
 import { DEFAULT_PRODUCTS } from '../../services/seedData';
 import { DiscoveryExplorer } from '../discovery/DiscoveryExplorer';
 import { SignUpGuideVideoBanner } from '../landing/SignUpGuideVideoBanner';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface LandingScreenProps {
   onNavigate: (screen: string) => void;
 }
 
 export const LandingScreen: React.FC<LandingScreenProps> = ({ onNavigate }) => {
+  const { currentUser } = useAuth();
+
+  React.useEffect(() => {
+    if (currentUser) {
+      onNavigate('discover');
+    }
+  }, [currentUser, onNavigate]);
+
+  if (currentUser) {
+    return null;
+  }
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 selection:bg-rose-100 selection:text-rose-900">
       {/* Top Banner: 18+ Verified Platform */}

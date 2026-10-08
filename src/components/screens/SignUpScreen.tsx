@@ -8,7 +8,13 @@ interface SignUpScreenProps {
 }
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
-  const { signupWithEmail, loginWithGoogle } = useAuth();
+  const { signupWithEmail, loginWithGoogle, currentUser } = useAuth();
+
+  React.useEffect(() => {
+    if (currentUser) {
+      onNavigate('discover');
+    }
+  }, [currentUser, onNavigate]);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,6 +28,10 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
   const [agreedSafety, setAgreedSafety] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (currentUser) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

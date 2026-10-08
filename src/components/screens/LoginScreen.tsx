@@ -7,7 +7,13 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate }) => {
-  const { loginWithEmail, loginWithGoogle, resetPassword } = useAuth();
+  const { loginWithEmail, loginWithGoogle, resetPassword, currentUser } = useAuth();
+
+  React.useEffect(() => {
+    if (currentUser) {
+      onNavigate('discover');
+    }
+  }, [currentUser, onNavigate]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,6 +21,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate }) => {
   const [error, setError] = useState<string | null>(null);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+
+  if (currentUser) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

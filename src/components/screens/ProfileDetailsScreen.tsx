@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   HeartHandshake,
+  MessageCircle,
   Wine,
   Cigarette,
   Dumbbell,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMatch } from '../../contexts/MatchContext';
+import { useChat } from '../../contexts/ChatContext';
 import { UserProfile, AICompatibilityResponse } from '../../types';
 import { geminiService } from '../../services/geminiService';
 import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
@@ -42,12 +44,24 @@ export const ProfileDetailsScreen: React.FC<ProfileDetailsScreenProps> = ({
 }) => {
   const { userProfile, isPakistanUser, isPremium } = useAuth();
   const { swipe } = useMatch();
+  const { startChatWithProfile } = useChat();
 
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [compatibility, setCompatibility] = useState<AICompatibilityResponse | null>(null);
   const [loadingCompat, setLoadingCompat] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
+  const handleStartDirectChat = async () => {
+    if (isPakistanUser && !isPremium && profile.country && profile.country.toLowerCase() !== 'pakistan') {
+      setUpgradeModalOpen(true);
+      return;
+    }
+    await startChatWithProfile(profile);
+    if (onNavigate) {
+      onNavigate('chat');
+    }
+  };
 
   const photos = profile.photos && profile.photos.length > 0
     ? profile.photos
@@ -146,24 +160,35 @@ export const ProfileDetailsScreen: React.FC<ProfileDetailsScreenProps> = ({
           </div>
 
           {/* Quick Action Toolbar */}
-          <div className="p-4 bg-white border-t border-stone-100 flex items-center justify-center gap-6">
+          <div className="p-4 bg-white border-t border-stone-100 flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
             <button
               onClick={() => handleAction('pass')}
               className="w-14 h-14 rounded-full bg-stone-50 border border-stone-200 text-stone-500 hover:text-rose-600 hover:border-rose-300 flex items-center justify-center shadow-xs transition-transform hover:scale-105 cursor-pointer"
+              title="Pass"
             >
               <X className="w-6 h-6 stroke-[2.5]" />
             </button>
             <button
               onClick={() => handleAction('superlike')}
               className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 text-amber-500 hover:bg-amber-100 flex items-center justify-center shadow-xs transition-transform hover:scale-105 cursor-pointer"
+              title="Super Like"
             >
               <Star className="w-5 h-5 fill-amber-500" />
             </button>
             <button
               onClick={() => handleAction('like')}
               className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md transition-transform hover:scale-105 cursor-pointer"
+              title="Like"
             >
               <Heart className="w-7 h-7 fill-white" />
+            </button>
+            <button
+              onClick={handleStartDirectChat}
+              className="px-5 py-3.5 bg-stone-900 hover:bg-black text-white text-xs font-bold rounded-full shadow-sm flex items-center justify-center gap-2 transition-transform hover:scale-105 cursor-pointer"
+              title="Direct Chat & Messaging"
+            >
+              <MessageCircle className="w-4 h-4 text-rose-400" />
+              <span>Message {profile.name.split(' ')[0]}</span>
             </button>
           </div>
         </div>

@@ -41,6 +41,7 @@ interface DiscoveryExplorerProps {
   onNavigateToAuth?: (mode: 'signup' | 'login') => void;
   onNavigateToPreferences?: () => void;
   onNavigateToPremium?: () => void;
+  onStartChat?: (profile: UserProfile) => void;
 }
 
 const SECTIONS_CONFIG: {
@@ -106,6 +107,7 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
   onNavigateToAuth,
   onNavigateToPreferences,
   onNavigateToPremium,
+  onStartChat,
 }) => {
   const { isPakistanUser, isPremium } = useAuth();
 
@@ -519,6 +521,7 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
                 onReport={onReport}
                 onBlock={onBlock}
                 onVisitorAction={handleVisitorAction}
+                onStartChat={onStartChat}
               />
             ))}
           </div>

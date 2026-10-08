@@ -10,6 +10,8 @@ import {
   sendPasswordResetEmail,
   deleteUser,
   sendEmailVerification,
+  setPersistence,
+  browserLocalPersistence,
 } from 'firebase/auth';
 import {
   doc,
@@ -210,6 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithEmail = async (email: string, pass: string) => {
     try {
+      await setPersistence(auth, browserLocalPersistence);
       const res = await signInWithEmailAndPassword(auth, email, pass);
       await fetchUserData(res.user);
     } catch (err: any) {
@@ -233,6 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
+      await setPersistence(auth, browserLocalPersistence);
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       const uid = cred.user.uid;
 
@@ -313,6 +317,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     try {
+      await setPersistence(auth, browserLocalPersistence);
       const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
       const user = res.user;

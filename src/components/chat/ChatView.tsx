@@ -156,20 +156,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (isPakistanUser && !isPremium && isOtherInternational) {
       setUpgradeModalOpen(true);
       return;
     }
-    if (!inputVal.trim() && !imageUrlInput.trim()) return;
+    const textToSend = inputVal.trim();
+    const imageToSend = imageUrlInput.trim();
+    if (!textToSend && !imageToSend) return;
 
-    const success = await sendMessage(inputVal, imageUrlInput || undefined);
-    if (success) {
-      setInputVal('');
-      setImageUrlInput('');
-      setShowImageInput(false);
-    }
+    // Immediately clear input field so input is reset instantly
+    setInputVal('');
+    setImageUrlInput('');
+    setShowImageInput(false);
+
+    // Immediately append message to active chat and write to Firestore
+    await sendMessage(textToSend, imageToSend || undefined);
   };
 
   const handleFetchStarters = async () => {
@@ -608,13 +611,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
             placeholder={`Message ${otherProfile.name}...`}
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white transition-all"
           />
 
           <button
-            type="submit"
+            type="button"
+            onClick={() => handleSend()}
             disabled={sendingMessage || (!inputVal.trim() && !imageUrlInput.trim())}
             className="p-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors disabled:opacity-40 cursor-pointer"
+            title="Send message"
+            aria-label="Send message"
           >
             <Send className="w-4 h-4" />
           </button>

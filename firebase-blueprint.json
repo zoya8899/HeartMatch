@@ -135,10 +135,11 @@
         "text": { "type": "string", "maxLength": 2000 },
         "imageUrl": { "type": "string", "maxLength": 2048 },
         "read": { "type": "boolean" },
+        "isRead": { "type": "boolean" },
         "deleted": { "type": "boolean" },
         "createdAt": { "type": "string" }
       },
-      "required": ["matchId", "senderId", "receiverId", "text", "read", "createdAt"]
+      "required": ["senderId", "receiverId", "text", "createdAt"]
     },
     "Subscription": {
       "title": "Subscription",
@@ -301,6 +302,10 @@
     "/matches/{matchId}/messages/{messageId}": {
       "schema": { "$ref": "#/entities/Message" },
       "description": "Real-time chat messages inside a match"
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Real-time chat messages with senderId, receiverId, text, createdAt, and isRead"
     },
     "/subscriptions/{userId}": {
       "schema": { "$ref": "#/entities/Subscription" },

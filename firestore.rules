@@ -120,6 +120,21 @@ service cloud.firestore {
       }
     }
 
+    // Messages collection (top-level direct chat messages: senderId, receiverId, text, createdAt, isRead)
+    match /messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        incoming().senderId == request.auth.uid &&
+        incoming().receiverId is string &&
+        incoming().text is string && incoming().text.size() <= 2000;
+      allow update: if isSignedIn() && (
+        existing().receiverId == request.auth.uid ||
+        existing().senderId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (existing().senderId == request.auth.uid || isAdmin());
+    }
+
     // Subscriptions collection
     match /subscriptions/{userId} {
       allow read: if isOwner(userId) || isAdmin();

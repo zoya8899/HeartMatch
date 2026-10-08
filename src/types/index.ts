@@ -160,6 +160,8 @@ export interface MessageRecord {
   voiceNoteUrl?: string;
   voiceDuration?: string;
   read: boolean;
+  isRead?: boolean;
+  conversationId?: string;
   deleted?: boolean;
   createdAt: string;
   flagged?: boolean;

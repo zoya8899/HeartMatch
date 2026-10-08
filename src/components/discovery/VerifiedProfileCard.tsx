@@ -13,6 +13,7 @@ import {
   Radio,
   Eye,
   CheckCircle,
+  MessageCircle,
 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { isPlaceholderPhoto } from '../profile/PhotoPortfolioManager';
@@ -27,6 +28,7 @@ interface VerifiedProfileCardProps {
   onReport?: (profile: UserProfile) => void;
   onBlock?: (profile: UserProfile) => void;
   onVisitorAction?: (actionName: string, profile: UserProfile) => void;
+  onStartChat?: (profile: UserProfile) => void;
 }
 
 const COUNTRY_FLAGS: Record<string, string> = {
@@ -53,6 +55,7 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
   onReport,
   onBlock,
   onVisitorAction,
+  onStartChat,
 }) => {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [actionFeedback, setActionFeedback] = useState<'liked' | 'passed' | 'superliked' | null>(null);
@@ -268,7 +271,7 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
             <span className="text-[10px] text-stone-400 font-medium">18+ Verified Member</span>
           )}
 
-          {/* Primary Action Buttons: Pass, Super Like, Like */}
+          {/* Primary Action Buttons: Pass, Message, Super Like, Like */}
           <div className="flex items-center gap-1.5">
             {/* Pass */}
             <button
@@ -279,6 +282,24 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
               aria-label={`Pass on ${profile.name}`}
             >
               <X className="w-4 h-4 stroke-[2.5]" />
+            </button>
+
+            {/* Direct Message */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isLoggedIn) {
+                  if (onVisitorAction) onVisitorAction('message', profile);
+                  return;
+                }
+                if (onStartChat) onStartChat(profile);
+              }}
+              className="w-9 h-9 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
+              title={`Message ${profile.name}`}
+              aria-label={`Message ${profile.name}`}
+            >
+              <MessageCircle className="w-4 h-4" />
             </button>
 
             {/* Super Like */}

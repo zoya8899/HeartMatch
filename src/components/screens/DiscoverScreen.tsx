@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMatch } from '../../contexts/MatchContext';
+import { useChat } from '../../contexts/ChatContext';
 import { UserProfile } from '../../types';
 import { DiscoveryExplorer } from '../discovery/DiscoveryExplorer';
 import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
@@ -37,6 +38,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
   onOpenProfileDetails,
 }) => {
   const { userProfile, isPakistanUser, isPremium } = useAuth();
+  const { startChatWithProfile } = useChat();
   const {
     currentCard,
     swipe,
@@ -179,6 +181,15 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({
           }}
           onNavigateToPreferences={() => onNavigate('dating_preferences')}
           onNavigateToPremium={() => onNavigate('premium_plans')}
+          onStartChat={async (p) => {
+            if (isPakistanUser && !isPremium && p.country && p.country.toLowerCase() !== 'pakistan') {
+              setUpgradeCardTarget(p);
+              setUpgradeModalOpen(true);
+              return;
+            }
+            await startChatWithProfile(p);
+            onNavigate('chat');
+          }}
         />
       ) : (
         /* Mode 2: Classic Card Stack Swipe Deck */
