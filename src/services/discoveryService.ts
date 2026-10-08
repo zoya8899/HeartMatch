@@ -70,12 +70,53 @@ export const discoveryService = {
       const res = await fetch(`/api/discovery/profiles?${query.toString()}`);
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
+
+      // Retrieve real registered community profiles from browser state
+      let realProfiles: UserProfile[] = [];
+      try {
+        const stored = localStorage.getItem('heartmatch_real_profiles');
+        if (stored) realProfiles = JSON.parse(stored);
+      } catch (e) {}
+
+      if (realProfiles.length > 0) {
+        // Exclude current user if specified
+        let eligibleReal = realProfiles.filter((p) => {
+          if (params.currentUserId && p.userId === params.currentUserId) {
+            // Keep current user visible in "Meet Verified Singles" only if explicitly browsing
+            return true;
+          }
+          if (params.country && params.country !== 'all' && p.country.toLowerCase() !== params.country.toLowerCase()) {
+            return false;
+          }
+          if (params.gender && params.gender !== 'everyone' && p.gender !== params.gender) {
+            return false;
+          }
+          return true;
+        });
+
+        // Merge real profiles at the top of the feed and deduplicate
+        const mergedProfiles = [
+          ...eligibleReal,
+          ...data.profiles.filter((dp: UserProfile) => !eligibleReal.some((rp) => rp.userId === dp.userId)),
+        ];
+
+        data.profiles = mergedProfiles;
+        data.total = Math.max(data.total, mergedProfiles.length);
+      }
+
       cache.set(cacheKey, { timestamp: Date.now(), data });
       return data;
     } catch (err) {
       console.warn('Network error fetching discovery profiles, using client fallback:', err);
-      // Fallback filtering
-      let list = [...INITIAL_DISCOVERY_PROFILES];
+      // Retrieve real registered community profiles from browser state
+      let realProfiles: UserProfile[] = [];
+      try {
+        const stored = localStorage.getItem('heartmatch_real_profiles');
+        if (stored) realProfiles = JSON.parse(stored);
+      } catch (e) {}
+
+      // Fallback filtering: Prioritize real registered users first!
+      let list = [...realProfiles, ...INITIAL_DISCOVERY_PROFILES.filter(p => !realProfiles.some(rp => rp.userId === p.userId))];
       if (params.country && params.country !== 'all') {
         list = list.filter((p) => p.country.toLowerCase() === params.country?.toLowerCase());
       }
@@ -83,6 +124,7 @@ export const discoveryService = {
         list = list.filter((p) => p.verified === true);
       } else if (params.section === 'online_now') {
         list = list.filter((p) => {
+          if (p.isRealUser) return true;
           const act = INITIAL_PROFILE_ACTIVITIES[p.userId];
           return act?.isOnline === true;
         });
@@ -90,11 +132,14 @@ export const discoveryService = {
         list = list.sort((a, b) => new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime());
       } else if (params.section === 'popular_profiles') {
         list = list.sort((a, b) => {
-          const sA = (INITIAL_PROFILE_ACTIVITIES[a.userId]?.likesReceivedCount || 0) * 2;
-          const sB = (INITIAL_PROFILE_ACTIVITIES[b.userId]?.likesReceivedCount || 0) * 2;
+          const sA = ((INITIAL_PROFILE_ACTIVITIES[a.userId]?.likesReceivedCount || 0) * 2) + (a.isRealUser ? 500 : 0);
+          const sB = ((INITIAL_PROFILE_ACTIVITIES[b.userId]?.likesReceivedCount || 0) * 2) + (b.isRealUser ? 500 : 0);
           return sB - sA;
         });
       }
+
+      // Prioritize real user profiles at the very top!
+      list = list.sort((a, b) => (b.isRealUser ? 1 : 0) - (a.isRealUser ? 1 : 0));
 
       if (params.currentUserId) {
         list = list.filter((p) => p.userId !== params.currentUserId);

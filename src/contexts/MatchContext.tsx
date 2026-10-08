@@ -58,7 +58,24 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Load and filter discovery profiles
   const loadDiscoveryProfiles = () => {
     setLoadingDiscovery(true);
-    let candidates = [...INITIAL_DISCOVERY_PROFILES];
+
+    // Retrieve real community registered profiles from browser state
+    let realProfiles: UserProfile[] = [];
+    try {
+      const stored = localStorage.getItem('heartmatch_real_profiles');
+      if (stored) realProfiles = JSON.parse(stored);
+    } catch (e) {}
+
+    // Exclude current user from candidate cards
+    const filteredReal = realProfiles.filter((p) => !currentUser || p.userId !== currentUser.uid);
+
+    // Prioritize real users first, then append mock seed profiles
+    let candidates = [
+      ...filteredReal,
+      ...INITIAL_DISCOVERY_PROFILES.filter(
+        (p) => (!currentUser || p.userId !== currentUser.uid) && !filteredReal.some((rp) => rp.userId === p.userId)
+      ),
+    ];
 
     // Exclude current user
     if (currentUser) {
@@ -84,6 +101,9 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
+    // Always sort real users first
+    candidates = candidates.sort((a, b) => (b.isRealUser ? 1 : 0) - (a.isRealUser ? 1 : 0));
+
     setDiscoveryProfiles(candidates);
     setCurrentCardIndex(0);
     setLoadingDiscovery(false);
@@ -91,6 +111,15 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     loadDiscoveryProfiles();
+
+    const handleProfileUpdate = () => {
+      loadDiscoveryProfiles();
+    };
+
+    window.addEventListener('heartmatch:profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('heartmatch:profile-updated', handleProfileUpdate);
+    };
   }, [currentUser, userPreference]);
 
   // Listen to matches for current user

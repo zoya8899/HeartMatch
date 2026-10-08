@@ -11,24 +11,12 @@ export const UploadPhotosScreen: React.FC<UploadPhotosScreenProps> = ({ onNaviga
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [photos, setPhotos] = useState<string[]>(
-    userProfile?.photos && userProfile.photos.length > 0
-      ? userProfile.photos
-      : [
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-        ]
+    userProfile?.photos && userProfile.photos.length > 0 ? userProfile.photos : []
   );
 
   const [newUrl, setNewUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const presetPhotos = [
-    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
-  ];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -227,22 +215,6 @@ export const UploadPhotosScreen: React.FC<UploadPhotosScreenProps> = ({ onNaviga
               >
                 Add Image
               </button>
-            </div>
-
-            {/* Quick Sample Presets */}
-            <div className="pt-2">
-              <span className="text-[11px] text-stone-400 block mb-1.5">Or choose a sample portrait:</span>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {presetPhotos.map((preset, i) => (
-                  <img
-                    key={i}
-                    src={preset}
-                    alt="Preset sample"
-                    onClick={() => handleAddPhoto(preset)}
-                    className="w-12 h-14 rounded-lg object-cover border border-stone-200 hover:ring-2 hover:ring-rose-500 cursor-pointer shrink-0"
-                  />
-                ))}
-              </div>
             </div>
           </div>
         )}

@@ -76,6 +76,8 @@ export interface UserProfile {
     audioUrl?: string;
   };
   updatedAt?: string;
+  isRealUser?: boolean;
+  profileSetupCompleted?: boolean;
 }
 
 export interface DiscoveryPreferences {

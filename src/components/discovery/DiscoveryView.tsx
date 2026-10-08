@@ -387,11 +387,17 @@ export const DiscoveryView: React.FC<DiscoveryViewProps> = ({
 
             {/* Profile Avatar Pair */}
             <div className="flex items-center justify-center gap-4 mb-8">
-              <img
-                src={userProfile?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
-                alt="You"
-                className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md ring-2 ring-rose-200"
-              />
+              {userProfile?.photos?.[0] ? (
+                <img
+                  src={userProfile.photos[0]}
+                  alt="You"
+                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md ring-2 ring-rose-200"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-rose-600 to-rose-400 text-white font-bold text-2xl flex items-center justify-center border-4 border-white shadow-md ring-2 ring-rose-200">
+                  {userProfile?.name?.charAt(0)?.toUpperCase() || '👤'}
+                </div>
+              )}
               <div className="w-10 h-10 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md">
                 <Heart className="w-5 h-5 fill-white" />
               </div>

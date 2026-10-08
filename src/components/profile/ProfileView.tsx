@@ -46,9 +46,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   // Photos list
   const [photos, setPhotos] = useState<string[]>(
-    userProfile?.photos && userProfile.photos.length > 0
-      ? userProfile.photos
-      : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80']
+    userProfile?.photos && userProfile.photos.length > 0 ? userProfile.photos : []
   );
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
 

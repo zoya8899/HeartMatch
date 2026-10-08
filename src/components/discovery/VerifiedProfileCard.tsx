@@ -29,6 +29,7 @@ interface VerifiedProfileCardProps {
 }
 
 const COUNTRY_FLAGS: Record<string, string> = {
+  'Pakistan': '🇵🇰',
   'United States': '🇺🇸',
   'United Kingdom': '🇬🇧',
   'Canada': '🇨🇦',

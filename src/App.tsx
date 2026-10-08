@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MatchProvider } from './contexts/MatchContext';
 import { ChatProvider } from './contexts/ChatContext';
@@ -31,20 +31,36 @@ import { SafetyCenterScreen } from './components/screens/SafetyCenterScreen'; //
 import { ReportUserScreen } from './components/screens/ReportUserScreen'; // Screen 19
 import { AdminDashboardScreen } from './components/screens/AdminDashboardScreen'; // Screen 20
 import { SuspendedAccountScreen } from './components/screens/SuspendedAccountScreen';
+import { ProfileSetupModal } from './components/profile/ProfileSetupModal';
 
 function AppContent() {
-  const { currentUser, userAccount, loading } = useAuth();
+  const { currentUser, userAccount, userProfile, loading } = useAuth();
 
   const [currentScreen, setCurrentScreen] = useState<string>(currentUser ? 'discover' : 'landing');
   const [selectedProfile, setSelectedProfile] = useState<UserProfile>(INITIAL_DISCOVERY_PROFILES[0]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('monthly_premium');
   const [reportTarget, setReportTarget] = useState<{ id: string; name: string }>({ id: 'user_target', name: 'Member' });
 
-  // Notifications and Safety modal
+  // Notifications, Safety modal, and Profile setup modal
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [safetyModalOpen, setSafetyModalOpen] = useState(false);
   const [safetyModalType, setSafetyModalType] = useState<'report' | 'block' | 'unmatch' | 'report_message'>('report');
   const [reportedMessage, setReportedMessage] = useState<{ id?: string; text?: string }>({});
+
+  // Real User Profile Setup & Edit Modal
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileModalTab, setProfileModalTab] = useState<'profile' | 'photos'>('profile');
+
+  // Mandatory Onboarding: If real logged in user hasn't set up their real photo/profile, prompt them immediately!
+  useEffect(() => {
+    if (currentUser && userProfile) {
+      const hasRealPhoto = userProfile.photos && userProfile.photos.length > 0;
+      if (!userProfile.profileSetupCompleted || !hasRealPhoto) {
+        setProfileModalTab(!hasRealPhoto ? 'photos' : 'profile');
+        setProfileModalOpen(true);
+      }
+    }
+  }, [currentUser, userProfile?.profileSetupCompleted, userProfile?.photos?.length]);
 
   if (loading) {
     return (
@@ -95,6 +111,10 @@ function AppContent() {
         currentScreen={currentScreen}
         onNavigate={navigateTo}
         openNotifications={() => setNotificationsOpen(true)}
+        onOpenProfileModal={(tab) => {
+          setProfileModalTab(tab || 'profile');
+          setProfileModalOpen(true);
+        }}
       />
 
       {/* Main Content Router rendering the 20 requested screens */}
@@ -223,6 +243,18 @@ function AppContent() {
         onSelectNotification={(link) => {
           if (link?.includes('matches')) navigateTo('matches');
           else if (link?.includes('likes')) navigateTo('likes');
+        }}
+      />
+
+      {/* Real User Profile Onboarding & Editing Modal */}
+      <ProfileSetupModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        initialTab={profileModalTab}
+        isOnboarding={Boolean(currentUser && (!userProfile?.profileSetupCompleted || !userProfile?.photos || userProfile.photos.length === 0))}
+        onComplete={() => {
+          setProfileModalOpen(false);
+          navigateTo('discover');
         }}
       />
     </div>

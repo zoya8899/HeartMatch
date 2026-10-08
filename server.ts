@@ -839,6 +839,14 @@ app.get('/api/discovery/profiles', (req: Request, res: Response) => {
       break;
   }
 
+  // Prioritize real registered user profiles at the front of the community feed!
+  sectionResults = sectionResults.sort((a, b) => {
+    const aReal = a.isRealUser ? 1 : 0;
+    const bReal = b.isRealUser ? 1 : 0;
+    if (bReal !== aReal) return bReal - aReal;
+    return 0;
+  });
+
   // Pagination
   const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
   const limitNum = Math.min(20, Math.max(1, parseInt(limit as string, 10) || 10));
@@ -855,6 +863,81 @@ app.get('/api/discovery/profiles', (req: Request, res: Response) => {
     section,
     countryFilter: country || null,
   });
+});
+
+// Real User Profiles Management (100% Real User Driven Web Application)
+app.post('/api/profiles/upsert', (req: Request, res: Response) => {
+  try {
+    const profileData = req.body as Partial<UserProfile>;
+    if (!profileData || !profileData.userId) {
+      return res.status(400).json({ error: 'Valid profile data and userId are required' });
+    }
+
+    const existingIndex = serverProfiles.findIndex((p) => p.userId === profileData.userId);
+
+    const fullProfile: UserProfile = {
+      userId: profileData.userId,
+      name: profileData.name || 'Community Member',
+      age: Number(profileData.age) || 25,
+      gender: profileData.gender || 'woman',
+      interestedIn: profileData.interestedIn || 'everyone',
+      city: profileData.city || 'Lahore',
+      country: profileData.country || 'Pakistan',
+      showCity: profileData.showCity ?? true,
+      bio: profileData.bio || 'New member on HeartMatch.',
+      photos: Array.isArray(profileData.photos) && profileData.photos.length > 0 ? profileData.photos : [],
+      interests: Array.isArray(profileData.interests) ? profileData.interests : ['Specialty Coffee', 'Travel', 'Music'],
+      hobbies: Array.isArray(profileData.hobbies) ? profileData.hobbies : ['Photography', 'Reading'],
+      profession: profileData.profession || 'Professional',
+      education: profileData.education || 'University Graduate',
+      languages: Array.isArray(profileData.languages) ? profileData.languages : ['Urdu', 'English'],
+      relationshipGoal: profileData.relationshipGoal || 'long-term',
+      completionPercentage: profileData.completionPercentage || 95,
+      verified: true,
+      verificationStatus: 'verified',
+      profileVerified: true,
+      optedIntoDiscovery: profileData.optedIntoDiscovery !== false,
+      onlineStatusVisibility: profileData.onlineStatusVisibility !== false,
+      isIncognito: profileData.isIncognito === true,
+      isRealUser: true,
+      profileSetupCompleted: true,
+      registeredAt: profileData.registeredAt || new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      serverProfiles[existingIndex] = { ...serverProfiles[existingIndex], ...fullProfile };
+    } else {
+      // Prepend to top of server profiles so real user appears first in community feed!
+      serverProfiles.unshift(fullProfile);
+    }
+
+    // Register active session in activity ledger
+    serverActivities[fullProfile.userId] = {
+      viewsCount: 1,
+      likesReceivedCount: 0,
+      matchesCount: 0,
+      lastActiveAt: new Date().toISOString(),
+      isOnline: true,
+    };
+
+    res.json({
+      success: true,
+      profile: sanitizePublicProfile(fullProfile, true),
+      message: 'Profile registered successfully in community feed.',
+    });
+  } catch (err: any) {
+    console.error('Error upserting profile:', err);
+    res.status(500).json({ error: 'Failed to update community profile' });
+  }
+});
+
+app.get('/api/profiles/real', (_req: Request, res: Response) => {
+  const realProfiles = serverProfiles
+    .filter((p) => p.isRealUser === true)
+    .map((p) => sanitizePublicProfile(p, true));
+  res.json({ profiles: realProfiles });
 });
 
 // 2. Explore by Country List (Only countries with eligible users)

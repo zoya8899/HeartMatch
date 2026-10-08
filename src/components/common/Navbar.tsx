@@ -30,6 +30,7 @@ interface NavbarProps {
   onNavigate: (screen: string) => void;
   openNotifications: () => void;
   unreadCount?: number;
+  onOpenProfileModal?: (tab?: 'profile' | 'photos') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -37,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   openNotifications,
   unreadCount = 0,
+  onOpenProfileModal,
 }) => {
   const {
     currentUser,
@@ -48,8 +50,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     boostsCount,
     rewindsCount,
     logout,
-    resendVerificationEmail,
-    confirmEmailVerified,
   } = useAuth();
   const { matches, activeBoost } = useMatch();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -59,38 +59,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-stone-200">
-      {/* 18+ Email Verification Banner */}
-      {currentUser && !currentUser.emailVerified && !userAccount?.emailVerified && currentScreen !== 'landing' && (
-        <div className="bg-amber-400 text-stone-950 px-4 py-2 text-xs flex flex-col sm:flex-row items-center justify-between gap-2 shadow-xs border-b border-amber-500">
-          <div className="flex items-center gap-2 font-medium">
-            <Mail className="w-4 h-4 text-stone-950 shrink-0" />
-            <span>
-              Please verify your email address (<strong>{currentUser.email}</strong>) to confirm account authenticity.
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={async () => {
-                await resendVerificationEmail();
-                alert('Verification email re-sent to ' + currentUser.email);
-              }}
-              className="px-2.5 py-1 bg-stone-900 text-white rounded-lg text-[11px] font-bold hover:bg-black cursor-pointer"
-            >
-              Resend Link
-            </button>
-            <button
-              onClick={async () => {
-                await confirmEmailVerified();
-                alert('Email verified successfully!');
-              }}
-              className="px-2.5 py-1 bg-white text-stone-900 rounded-lg text-[11px] font-semibold hover:bg-amber-50 cursor-pointer border border-amber-600"
-            >
-              I've Verified
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo */}
         <div
@@ -232,12 +200,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                   className="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-rose-200 transition-all cursor-pointer focus:outline-none"
+                  title="Profile Menu"
                 >
-                  <img
-                    src={userProfile?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
-                    alt={userProfile?.name || 'Profile'}
-                    className="w-8 h-8 rounded-full object-cover border border-stone-200"
-                  />
+                  {userProfile?.photos && userProfile.photos.length > 0 && userProfile.photos[0] ? (
+                    <img
+                      src={userProfile.photos[0]}
+                      alt={userProfile?.name || 'Profile'}
+                      className="w-8 h-8 rounded-full object-cover border border-rose-300 shadow-xs"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-600 to-rose-400 text-white font-bold text-xs flex items-center justify-center border border-stone-200 shadow-xs">
+                      {userProfile?.name?.charAt(0)?.toUpperCase() || '👤'}
+                    </div>
+                  )}
                 </button>
 
                 {profileDropdownOpen && (
@@ -259,24 +234,32 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="py-1">
                       <button
                         onClick={() => {
-                          onNavigate('create_profile');
+                          if (onOpenProfileModal) {
+                            onOpenProfileModal('profile');
+                          } else {
+                            onNavigate('create_profile');
+                          }
                           setProfileDropdownOpen(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-xs text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
                       >
-                        <UserCheck className="w-4 h-4 text-stone-400" />
-                        <span>Edit Profile</span>
+                        <UserCheck className="w-4 h-4 text-rose-500" />
+                        <span className="font-semibold text-stone-900">Edit Profile</span>
                       </button>
 
                       <button
                         onClick={() => {
-                          onNavigate('upload_photos');
+                          if (onOpenProfileModal) {
+                            onOpenProfileModal('photos');
+                          } else {
+                            onNavigate('upload_photos');
+                          }
                           setProfileDropdownOpen(false);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-xs text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
                       >
-                        <Camera className="w-4 h-4 text-stone-400" />
-                        <span>Upload Photos</span>
+                        <Camera className="w-4 h-4 text-rose-500" />
+                        <span className="font-semibold text-stone-900">Upload Photos</span>
                       </button>
 
                       <button

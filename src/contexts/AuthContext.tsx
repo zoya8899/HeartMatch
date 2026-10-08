@@ -259,7 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       await setDoc(doc(db, 'users', uid), newAccount);
 
-      // Create Profile doc with instant verified approval and public discovery
+      // Create Profile doc with instant verified approval and public discovery (NO fake stock photos)
       const newProfile: UserProfile = {
         userId: uid,
         name,
@@ -269,10 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         city: userCity || (isPak ? 'Lahore' : 'New York'),
         country: userCountry || (isPak ? 'Pakistan' : 'United States'),
         bio: `Hello! I'm ${name}. Excited to meet genuine, kind people and build meaningful connections.`,
-        photos: [
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80'
-        ],
+        photos: [], // 100% Real User Driven: NO fake stock photos! User uploads their real photo
         interests: ['Specialty Coffee', 'Music', 'Travel', 'Art', 'Fitness'],
         hobbies: ['Weekend Roadtrips', 'Reading', 'Photography'],
         profession: 'Professional',
@@ -284,6 +281,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profileVerified: true,
         optedIntoDiscovery: true, // Immediately discoverable publicly!
         isIncognito: false,
+        isRealUser: true,
+        profileSetupCompleted: false, // Triggers prompt to complete real profile and upload real photo
         registeredAt: new Date().toISOString(),
         lastActiveAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -322,7 +321,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profileSnap = await getDoc(profileRef);
 
       if (!profileSnap.exists()) {
-        // Create initial default auto-approved profile for Google user
+        // Create initial default auto-approved profile for Google user (NO fake model photos)
         const initialProfile: UserProfile = {
           userId: user.uid,
           name: user.displayName || 'Member',
@@ -332,19 +331,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           city: 'Lahore',
           country: 'Pakistan',
           bio: 'Looking for meaningful conversations, shared adventures, and genuine people.',
-          photos: [
-            user.photoURL ||
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80'
-          ],
+          photos: user.photoURL ? [user.photoURL] : [], // Use Google avatar if available, never fake stock photos
           interests: ['Art', 'Culinary', 'Travel', 'Wellness'],
           hobbies: ['Music', 'Hiking'],
           relationshipGoal: 'long-term',
-          completionPercentage: 85,
+          completionPercentage: user.photoURL ? 85 : 60,
           verified: true, // Instant auto-approval!
           verificationStatus: 'verified',
           profileVerified: true,
           optedIntoDiscovery: true, // Immediately public!
           isIncognito: false,
+          isRealUser: true,
+          profileSetupCompleted: Boolean(user.photoURL),
           registeredAt: new Date().toISOString(),
           lastActiveAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -508,9 +506,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       merged.verified = true; // Instant auto-approval
       merged.verificationStatus = 'verified'; // Instant auto-approval
       merged.optedIntoDiscovery = true;
+      merged.isRealUser = true;
+      if (merged.photos && merged.photos.length > 0 && merged.bio) {
+        merged.profileSetupCompleted = true;
+      }
 
       await setDoc(doc(db, 'profiles', currentUser.uid), merged, { merge: true });
       setUserProfile(merged);
+
+      // 1. Sync immediately with backend discovery engine
+      try {
+        await fetch('/api/profiles/upsert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(merged),
+        });
+      } catch (backendErr) {
+        console.warn('Backend profile upsert note:', backendErr);
+      }
+
+      // 2. Persist in browser local storage
+      try {
+        localStorage.setItem(`heartmatch_profile_${currentUser.uid}`, JSON.stringify(merged));
+        const storedList = JSON.parse(localStorage.getItem('heartmatch_real_profiles') || '[]');
+        const updatedList = [
+          merged,
+          ...storedList.filter((p: any) => p.userId !== merged.userId),
+        ];
+        localStorage.setItem('heartmatch_real_profiles', JSON.stringify(updatedList));
+
+        // 3. Dispatch reactive event so discover feed & cards refresh instantly
+        window.dispatchEvent(new CustomEvent('heartmatch:profile-updated', { detail: merged }));
+      } catch (storageErr) {
+        console.warn('LocalStorage real profile note:', storageErr);
+      }
     } catch (err: any) {
       if (err.message?.includes('Warning:') || err.message?.includes('disabled and blocked')) {
         throw err;

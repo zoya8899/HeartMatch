@@ -206,6 +206,19 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
     loadProfiles(true);
   }, [activeSection, selectedCountry, filterGender, filterGoal, filterMinAge, filterMaxAge]);
 
+  // Reactive listener: when real user updates profile or finishes onboarding, reload feed immediately
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      discoveryService.clearCache();
+      loadProfiles(true);
+    };
+
+    window.addEventListener('heartmatch:profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('heartmatch:profile-updated', handleProfileUpdate);
+    };
+  }, []);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     discoveryService.clearCache();
