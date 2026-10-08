@@ -22,6 +22,7 @@ import {
   BoostRecord,
 } from '../types';
 import { INITIAL_DISCOVERY_PROFILES } from '../services/seedData';
+import { fetchRealFirestoreProfiles } from '../services/discoveryService';
 
 interface MatchContextType {
   discoveryProfiles: UserProfile[];
@@ -56,20 +57,25 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [historyQueue, setHistoryQueue] = useState<{ profile: UserProfile; action: 'like' | 'pass' | 'superlike'; likeDocId?: string }[]>([]);
 
   // Load and filter discovery profiles
-  const loadDiscoveryProfiles = () => {
+  const loadDiscoveryProfiles = async () => {
     setLoadingDiscovery(true);
 
-    // Retrieve real community registered profiles from browser state
+    // 1. Fetch real registered profiles from Firestore `profiles` collection
     let realProfiles: UserProfile[] = [];
     try {
-      const stored = localStorage.getItem('heartmatch_real_profiles');
-      if (stored) realProfiles = JSON.parse(stored);
-    } catch (e) {}
+      realProfiles = await fetchRealFirestoreProfiles();
+    } catch (e) {
+      console.warn('Error fetching Firestore profiles for swipe deck:', e);
+      try {
+        const stored = localStorage.getItem('heartmatch_real_profiles');
+        if (stored) realProfiles = JSON.parse(stored);
+      } catch (err) {}
+    }
 
-    // Exclude current user from candidate cards
+    // Exclude current user from candidate cards (users swipe prospective partners)
     const filteredReal = realProfiles.filter((p) => !currentUser || p.userId !== currentUser.uid);
 
-    // Prioritize real users first, followed by the 20 AI personas
+    // Prioritize real registered users first, followed by the 20 AI personas
     let candidates = [
       ...filteredReal,
       ...INITIAL_DISCOVERY_PROFILES.filter(
@@ -101,7 +107,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    // Always sort real users first
+    // Always sort real users at the very top of the swipe deck
     candidates = candidates.sort((a, b) => (b.isRealUser ? 1 : 0) - (a.isRealUser ? 1 : 0));
 
     setDiscoveryProfiles(candidates);
@@ -112,12 +118,21 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     loadDiscoveryProfiles();
 
+    // Real-time snapshot listener on Firestore `profiles` collection
+    const profilesCol = collection(db, 'profiles');
+    const unsubProfiles = onSnapshot(profilesCol, () => {
+      loadDiscoveryProfiles();
+    }, (err) => {
+      console.warn('Profiles snapshot listener notice in MatchContext:', err);
+    });
+
     const handleProfileUpdate = () => {
       loadDiscoveryProfiles();
     };
 
     window.addEventListener('heartmatch:profile-updated', handleProfileUpdate);
     return () => {
+      unsubProfiles();
       window.removeEventListener('heartmatch:profile-updated', handleProfileUpdate);
     };
   }, [currentUser, userPreference]);

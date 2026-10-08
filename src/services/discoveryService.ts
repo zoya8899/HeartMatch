@@ -8,6 +8,8 @@ import {
   ELIGIBLE_DISCOVERY_COUNTRIES,
   INITIAL_PROFILE_ACTIVITIES,
 } from './seedData';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 export interface DiscoveryQueryParams {
   section?: DiscoverySectionId | 'all';
@@ -18,6 +20,7 @@ export interface DiscoveryQueryParams {
   maxAge?: number;
   relationshipGoal?: string;
   currentUserId?: string;
+  currentUserProfile?: UserProfile | null;
   page?: number;
   limit?: number;
   isLoggedIn?: boolean;
@@ -42,7 +45,76 @@ export interface PlatformStats {
 
 // Memory cache for sub-second responses and reduced network overhead
 const cache = new Map<string, { timestamp: number; data: any }>();
-const CACHE_TTL_MS = 60 * 1000; // 1 minute
+const CACHE_TTL_MS = 15 * 1000; // 15 seconds
+
+/**
+ * Fetch all real registered profiles from Firestore `profiles` collection
+ */
+export async function fetchRealFirestoreProfiles(): Promise<UserProfile[]> {
+  const profileMap = new Map<string, UserProfile>();
+
+  // 1. Fetch directly from Firestore `profiles` collection
+  try {
+    const snap = await getDocs(collection(db, 'profiles'));
+    snap.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      const p: UserProfile = {
+        userId: docSnap.id,
+        name: data.name || 'Member',
+        age: typeof data.age === 'number' ? data.age : 25,
+        gender: data.gender || 'woman',
+        interestedIn: data.interestedIn || 'everyone',
+        city: data.city || 'Lahore',
+        country: data.country || 'Pakistan',
+        showCity: data.showCity !== false,
+        bio: data.bio || '',
+        photos: Array.isArray(data.photos) ? data.photos : [],
+        interests: Array.isArray(data.interests) ? data.interests : [],
+        hobbies: Array.isArray(data.hobbies) ? data.hobbies : [],
+        profession: data.profession || 'Member',
+        education: data.education || '',
+        languages: Array.isArray(data.languages) ? data.languages : ['Urdu', 'English'],
+        relationshipGoal: data.relationshipGoal || 'long-term',
+        completionPercentage: data.completionPercentage || 90,
+        verified: true,
+        verificationStatus: 'verified',
+        profileVerified: true,
+        optedIntoDiscovery: true,
+        isRealUser: true,
+        isAIPersona: false,
+        registeredAt: data.registeredAt || data.createdAt || new Date().toISOString(),
+        lastActiveAt: data.lastActiveAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+        prompts: Array.isArray(data.prompts) ? data.prompts : [],
+        lifestyle: data.lifestyle || {},
+      };
+      profileMap.set(p.userId, p);
+    });
+  } catch (err) {
+    console.warn('Error fetching Firestore profiles collection:', err);
+  }
+
+  // 2. Also incorporate any local browser updates
+  try {
+    const stored = localStorage.getItem('heartmatch_real_profiles');
+    if (stored) {
+      const localList: UserProfile[] = JSON.parse(stored);
+      localList.forEach((lp) => {
+        if (lp.userId) {
+          const existing = profileMap.get(lp.userId);
+          profileMap.set(lp.userId, {
+            ...(existing || {}),
+            ...lp,
+            isRealUser: true,
+            isAIPersona: false,
+          });
+        }
+      });
+    }
+  } catch (e) {}
+
+  return Array.from(profileMap.values());
+}
 
 export const discoveryService = {
   // 1. Fetch Discovery Profiles (Supports the 6 sections, pagination, countries, filters)
@@ -54,58 +126,84 @@ export const discoveryService = {
     }
 
     try {
-      const query = new URLSearchParams();
-      if (params.section) query.set('section', params.section);
-      if (params.country) query.set('country', params.country);
-      if (params.userCountry) query.set('userCountry', params.userCountry);
-      if (params.gender) query.set('gender', params.gender);
-      if (params.minAge) query.set('minAge', String(params.minAge));
-      if (params.maxAge) query.set('maxAge', String(params.maxAge));
-      if (params.relationshipGoal) query.set('relationshipGoal', params.relationshipGoal);
-      if (params.currentUserId) query.set('currentUserId', params.currentUserId);
-      if (params.page) query.set('page', String(params.page));
-      if (params.limit) query.set('limit', String(params.limit));
-      if (params.isLoggedIn !== undefined) query.set('isLoggedIn', String(params.isLoggedIn));
+      // 1. Fetch real registered profiles from Firestore `profiles` collection
+      const allRealProfiles = await fetchRealFirestoreProfiles();
 
-      const res = await fetch(`/api/discovery/profiles?${query.toString()}`);
-      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      const data = await res.json();
-
-      // Retrieve real registered community profiles from browser state
-      let realProfiles: UserProfile[] = [];
-      try {
-        const stored = localStorage.getItem('heartmatch_real_profiles');
-        if (stored) realProfiles = JSON.parse(stored);
-      } catch (e) {}
-
-      if (realProfiles.length > 0) {
-        // Exclude current user if specified
-        let eligibleReal = realProfiles.filter((p) => {
-          if (params.currentUserId && p.userId === params.currentUserId) {
-            // Keep current user visible in "Meet Verified Singles" only if explicitly browsing
-            return true;
-          }
-          if (params.country && params.country !== 'all' && p.country.toLowerCase() !== params.country.toLowerCase()) {
-            return false;
-          }
-          if (params.gender && params.gender !== 'everyone' && p.gender !== params.gender) {
-            return false;
-          }
-          return true;
-        });
-
-        // Prioritize real registered users first, followed by interactive personas
-        const remainingPersonas = data.profiles.filter(
-          (dp: UserProfile) => !eligibleReal.some((rp) => rp.userId === dp.userId)
-        );
-        const mergedProfiles = [
-          ...eligibleReal,
-          ...remainingPersonas,
-        ];
-
-        data.profiles = mergedProfiles;
-        data.total = Math.max(data.total, mergedProfiles.length);
+      // Ensure logged-in user's profile card is guaranteed to be in the list
+      if (params.currentUserProfile && params.currentUserProfile.userId) {
+        const myUid = params.currentUserProfile.userId;
+        const exists = allRealProfiles.some((p) => p.userId === myUid);
+        if (!exists) {
+          allRealProfiles.unshift({
+            ...params.currentUserProfile,
+            isRealUser: true,
+            optedIntoDiscovery: true,
+          });
+        }
       }
+
+      // Filter real profiles according to selected filters
+      let eligibleReal = allRealProfiles.filter((p) => {
+        // ALWAYS DISPLAY the logged-in user's own profile card in the feed!
+        if (params.currentUserId && p.userId === params.currentUserId) {
+          return true;
+        }
+        if (params.country && params.country !== 'all' && p.country.toLowerCase() !== params.country.toLowerCase()) {
+          return false;
+        }
+        if (params.gender && params.gender !== 'everyone' && p.gender !== params.gender) {
+          return false;
+        }
+        if (params.minAge && p.age < params.minAge) {
+          return false;
+        }
+        if (params.maxAge && p.age > params.maxAge) {
+          return false;
+        }
+        return true;
+      });
+
+      // Sort real profiles: logged-in user at the absolute top, followed by other real registered users!
+      eligibleReal.sort((a, b) => {
+        if (params.currentUserId) {
+          if (a.userId === params.currentUserId) return -1;
+          if (b.userId === params.currentUserId) return 1;
+        }
+        return new Date(b.updatedAt || b.registeredAt || 0).getTime() - new Date(a.updatedAt || a.registeredAt || 0).getTime();
+      });
+
+      // 2. Filter dummy/bot profiles and keep them strictly at the bottom
+      let dummyProfiles = INITIAL_DISCOVERY_PROFILES.filter(
+        (dp) => !allRealProfiles.some((rp) => rp.userId === dp.userId)
+      );
+
+      if (params.country && params.country !== 'all') {
+        dummyProfiles = dummyProfiles.filter((p) => p.country.toLowerCase() === params.country?.toLowerCase());
+      }
+      if (params.gender && params.gender !== 'everyone') {
+        dummyProfiles = dummyProfiles.filter((p) => p.gender === params.gender);
+      }
+      if (params.minAge) {
+        dummyProfiles = dummyProfiles.filter((p) => p.age >= params.minAge!);
+      }
+      if (params.maxAge) {
+        dummyProfiles = dummyProfiles.filter((p) => p.age <= params.maxAge!);
+      }
+
+      // 3. REAL PROFILES AT THE VERY TOP, DUMMY/BOT PROFILES AT THE BOTTOM
+      const mergedProfiles = [
+        ...eligibleReal,
+        ...dummyProfiles,
+      ];
+
+      const data: DiscoveryResponse = {
+        profiles: mergedProfiles,
+        total: mergedProfiles.length,
+        page: params.page || 1,
+        totalPages: Math.ceil(mergedProfiles.length / (params.limit || 8)) || 1,
+        section: params.section || 'verified_singles',
+        countryFilter: params.country || null,
+      };
 
       cache.set(cacheKey, { timestamp: Date.now(), data });
       return data;
@@ -119,6 +217,12 @@ export const discoveryService = {
       } catch (e) {}
 
       // Fallback filtering: prioritize real users first followed by AI personas
+      if (params.currentUserProfile && params.currentUserProfile.userId) {
+        if (!realProfiles.some((p) => p.userId === params.currentUserProfile!.userId)) {
+          realProfiles.unshift({ ...params.currentUserProfile, isRealUser: true, optedIntoDiscovery: true });
+        }
+      }
+
       let list = [
         ...realProfiles,
         ...INITIAL_DISCOVERY_PROFILES.filter((p) => !realProfiles.some((rp) => rp.userId === p.userId)),
@@ -144,12 +248,14 @@ export const discoveryService = {
         });
       }
 
-      // Prioritize real user profiles at the very top!
-      list = list.sort((a, b) => (b.isRealUser ? 1 : 0) - (a.isRealUser ? 1 : 0));
-
-      if (params.currentUserId) {
-        list = list.filter((p) => p.userId !== params.currentUserId);
-      }
+      // Prioritize real user profiles at the very top, with logged-in user at the absolute top!
+      list = list.sort((a, b) => {
+        if (params.currentUserId) {
+          if (a.userId === params.currentUserId) return -1;
+          if (b.userId === params.currentUserId) return 1;
+        }
+        return (b.isRealUser ? 1 : 0) - (a.isRealUser ? 1 : 0);
+      });
 
       const limit = params.limit || 8;
       const page = params.page || 1;

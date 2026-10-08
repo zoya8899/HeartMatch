@@ -517,16 +517,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         {/* Typing indicator */}
         {isTyping && (
-          <div className="flex items-center gap-2 text-stone-400 text-xs">
+          <div className="flex items-center gap-2 text-stone-500 text-xs py-1">
             <img
               src={otherProfile.photos?.[0]}
               alt={otherProfile.name}
-              className="w-5 h-5 rounded-full object-cover"
+              className="w-6 h-6 rounded-full object-cover ring-1 ring-stone-200"
             />
-            <div className="bg-white border border-stone-200 px-3 py-1.5 rounded-full flex items-center gap-1 shadow-xs">
-              <span className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" />
-              <span className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-              <span className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+            <div className="bg-white border border-stone-200 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-xs">
+              <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" />
+              <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+              <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+              <span className="text-[11px] text-stone-500 font-medium italic ml-1">
+                {otherProfile.name} is typing...
+              </span>
             </div>
           </div>
         )}

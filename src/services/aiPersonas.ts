@@ -1,4 +1,4 @@
-import { UserProfile } from '../types';
+import { UserProfile } from '../types/index.ts';
 
 export interface AIPersonaConfig {
   id: string;

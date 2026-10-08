@@ -21,6 +21,7 @@ import { isPlaceholderPhoto } from '../profile/PhotoPortfolioManager';
 interface VerifiedProfileCardProps {
   profile: UserProfile;
   isLoggedIn: boolean;
+  currentUserId?: string;
   onLike?: (profile: UserProfile) => void;
   onPass?: (profile: UserProfile) => void;
   onSuperLike?: (profile: UserProfile) => void;
@@ -48,6 +49,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
 export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
   profile,
   isLoggedIn,
+  currentUserId,
   onLike,
   onPass,
   onSuperLike,
@@ -59,6 +61,8 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
 }) => {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [actionFeedback, setActionFeedback] = useState<'liked' | 'passed' | 'superliked' | null>(null);
+
+  const isSelf = !!(currentUserId && profile.userId === currentUserId);
 
   const realPhotos = profile.photos && profile.photos.length > 0
     ? profile.photos.filter((p) => !isPlaceholderPhoto(p))
@@ -99,6 +103,10 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
     <div
       onClick={handleView}
       className={`group relative bg-white rounded-3xl overflow-hidden border border-stone-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer ${
+        isSelf
+          ? 'ring-2 ring-rose-500/50 shadow-rose-100/50'
+          : ''
+      } ${
         actionFeedback === 'liked'
           ? 'ring-4 ring-rose-400 scale-[0.98]'
           : actionFeedback === 'passed'
@@ -132,8 +140,16 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
 
         {/* Top Badges Row */}
         <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
-          {/* Genuine Verification Badge */}
-          {isVerifiedGenuinely ? (
+          {/* Genuine Verification or Self Badge */}
+          {isSelf ? (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-rose-600 to-amber-500 text-white text-[11px] font-bold shadow-lg ring-1 ring-white/50 tracking-wide"
+              title="This is your own profile card as seen by other members"
+            >
+              <Sparkles className="w-3.5 h-3.5 fill-white" />
+              <span>You (Your Profile)</span>
+            </div>
+          ) : isVerifiedGenuinely ? (
             <div
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/90 backdrop-blur-md text-white text-[11px] font-bold shadow-md tracking-wide"
               title="Identity & Age Verified (18+ Government ID & Live Selfie Match)"
@@ -239,91 +255,109 @@ export const VerifiedProfileCard: React.FC<VerifiedProfileCardProps> = ({
 
         {/* Action Buttons Toolbar */}
         <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-1">
-          {/* Left mini tools: Report / Block */}
-          {isLoggedIn ? (
-            <div className="flex items-center gap-1 text-stone-400">
+          {isSelf ? (
+            <div className="w-full flex items-center justify-between py-0.5">
+              <span className="text-xs text-rose-600 font-bold flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 fill-rose-500" />
+                <span>Your Public Card</span>
+              </span>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onReport) onReport(profile);
-                }}
-                className="p-1.5 rounded-lg hover:bg-stone-100 hover:text-stone-700 transition-colors"
-                title="Report Profile"
-                aria-label={`Report ${profile.name}'s profile`}
+                onClick={handleView}
+                className="px-3.5 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                <Flag className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onBlock) onBlock(profile);
-                }}
-                className="p-1.5 rounded-lg hover:bg-stone-100 hover:text-stone-700 transition-colors"
-                title="Block Profile"
-                aria-label={`Block ${profile.name}'s profile`}
-              >
-                <Ban className="w-3.5 h-3.5" />
+                Preview Profile
               </button>
             </div>
           ) : (
-            <span className="text-[10px] text-stone-400 font-medium">18+ Verified Member</span>
+            <>
+              {/* Left mini tools: Report / Block */}
+              {isLoggedIn ? (
+                <div className="flex items-center gap-1 text-stone-400">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onReport) onReport(profile);
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                    title="Report Profile"
+                    aria-label={`Report ${profile.name}'s profile`}
+                  >
+                    <Flag className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onBlock) onBlock(profile);
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                    title="Block Profile"
+                    aria-label={`Block ${profile.name}'s profile`}
+                  >
+                    <Ban className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[10px] text-stone-400 font-medium">18+ Verified Member</span>
+              )}
+
+              {/* Primary Action Buttons: Pass, Message, Super Like, Like */}
+              <div className="flex items-center gap-1.5">
+                {/* Pass */}
+                <button
+                  type="button"
+                  onClick={(e) => handleAction(e, 'pass')}
+                  className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
+                  title="Pass"
+                  aria-label={`Pass on ${profile.name}`}
+                >
+                  <X className="w-4 h-4 stroke-[2.5]" />
+                </button>
+
+                {/* Direct Message */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isLoggedIn) {
+                      if (onVisitorAction) onVisitorAction('message', profile);
+                      return;
+                    }
+                    if (onStartChat) onStartChat(profile);
+                  }}
+                  className="w-9 h-9 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
+                  title={`Message ${profile.name}`}
+                  aria-label={`Message ${profile.name}`}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </button>
+
+                {/* Super Like */}
+                <button
+                  type="button"
+                  onClick={(e) => handleAction(e, 'superlike')}
+                  className="w-9 h-9 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-500 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
+                  title="Super Like"
+                  aria-label={`Super Like ${profile.name}`}
+                >
+                  <Star className="w-4 h-4 fill-amber-500" />
+                </button>
+
+                {/* Like */}
+                <button
+                  type="button"
+                  onClick={(e) => handleAction(e, 'like')}
+                  className="w-10 h-10 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-sm hover:shadow-md transition-transform hover:scale-105 cursor-pointer"
+                  title="Like"
+                  aria-label={`Like ${profile.name}`}
+                >
+                  <Heart className="w-5 h-5 fill-white" />
+                </button>
+              </div>
+            </>
           )}
-
-          {/* Primary Action Buttons: Pass, Message, Super Like, Like */}
-          <div className="flex items-center gap-1.5">
-            {/* Pass */}
-            <button
-              type="button"
-              onClick={(e) => handleAction(e, 'pass')}
-              className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
-              title="Pass"
-              aria-label={`Pass on ${profile.name}`}
-            >
-              <X className="w-4 h-4 stroke-[2.5]" />
-            </button>
-
-            {/* Direct Message */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isLoggedIn) {
-                  if (onVisitorAction) onVisitorAction('message', profile);
-                  return;
-                }
-                if (onStartChat) onStartChat(profile);
-              }}
-              className="w-9 h-9 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
-              title={`Message ${profile.name}`}
-              aria-label={`Message ${profile.name}`}
-            >
-              <MessageCircle className="w-4 h-4" />
-            </button>
-
-            {/* Super Like */}
-            <button
-              type="button"
-              onClick={(e) => handleAction(e, 'superlike')}
-              className="w-9 h-9 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-500 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
-              title="Super Like"
-              aria-label={`Super Like ${profile.name}`}
-            >
-              <Star className="w-4 h-4 fill-amber-500" />
-            </button>
-
-            {/* Like */}
-            <button
-              type="button"
-              onClick={(e) => handleAction(e, 'like')}
-              className="w-10 h-10 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-sm hover:shadow-md transition-transform hover:scale-105 cursor-pointer"
-              title="Like"
-              aria-label={`Like ${profile.name}`}
-            >
-              <Heart className="w-5 h-5 fill-white" />
-            </button>
-          </div>
         </div>
       </div>
     </div>

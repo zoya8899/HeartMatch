@@ -50,6 +50,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const receiverId = activeMatch.user1Id === currentUser.uid ? activeMatch.user2Id : activeMatch.user1Id;
     const conversationId = [currentUser.uid, receiverId].sort().join('_');
 
+    // Pre-load saved messages from localStorage immediately so messages never vanish
+    try {
+      const cached = localStorage.getItem(`heartmatch_chat_${conversationId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch (e) {}
+
     // 1. Real-time snapshot listener on top-level `messages` collection
     const messagesCol = collection(db, 'messages');
     const q = query(
@@ -122,6 +133,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribeSub();
     };
   }, [currentUser, activeMatch]);
+
+  // Persist messages to local storage whenever updated
+  useEffect(() => {
+    if (!currentUser || !activeMatch || messages.length === 0) return;
+    const receiverId = activeMatch.user1Id === currentUser.uid ? activeMatch.user2Id : activeMatch.user1Id;
+    const conversationId = [currentUser.uid, receiverId].sort().join('_');
+    try {
+      localStorage.setItem(`heartmatch_chat_${conversationId}`, JSON.stringify(messages));
+    } catch (e) {}
+  }, [messages, currentUser, activeMatch]);
 
   /**
    * Starts a direct conversation thread with any profile

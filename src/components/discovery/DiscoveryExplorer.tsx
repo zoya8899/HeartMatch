@@ -28,6 +28,7 @@ import { CountryDiscoveryBar } from './CountryDiscoveryBar';
 import { VisitorAuthPromptModal } from './VisitorAuthPromptModal';
 import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { isAIPersonaUser } from '../../services/aiPersonas';
 
 interface DiscoveryExplorerProps {
   isLoggedIn: boolean;
@@ -185,6 +186,7 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
         minAge: filterMinAge > 18 ? filterMinAge : undefined,
         maxAge: filterMaxAge < 65 ? filterMaxAge : undefined,
         currentUserId: currentUserProfile?.userId,
+        currentUserProfile: currentUserProfile,
         page: currentPage,
         limit: 8, // 8 cards per fetch (within 7-10 request range)
         isLoggedIn,
@@ -246,6 +248,7 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
   };
 
   const isTargetInternational = (p: UserProfile) => {
+    if (p.isAIPersona || isAIPersonaUser(p.userId)) return false;
     return p.country && p.country.toLowerCase() !== 'pakistan';
   };
 
@@ -514,6 +517,7 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
                 key={profile.userId}
                 profile={profile}
                 isLoggedIn={isLoggedIn}
+                currentUserId={currentUserProfile?.userId}
                 onLike={handleCardLike}
                 onPass={onPass}
                 onSuperLike={handleCardSuperLike}
