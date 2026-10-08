@@ -29,6 +29,7 @@ import { VisitorAuthPromptModal } from './VisitorAuthPromptModal';
 import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { isAIPersonaUser } from '../../services/aiPersonas';
+import { getCurrentActiveMembersCount, getNextActiveMembersCount } from '../../services/activityTickerService';
 
 interface DiscoveryExplorerProps {
   isLoggedIn: boolean;
@@ -124,6 +125,7 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [countries, setCountries] = useState<CountryDiscoveryItem[]>([]);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [liveOnlineCount, setLiveOnlineCount] = useState<number>(() => getCurrentActiveMembersCount());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
@@ -166,6 +168,14 @@ export const DiscoveryExplorer: React.FC<DiscoveryExplorerProps> = ({
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // Naturally fluctuate live active count in sync with activity ticker
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveOnlineCount(getNextActiveMembersCount());
+    }, 8500);
+    return () => clearInterval(timer);
   }, []);
 
   // Fetch Profiles when section, country, or filters change

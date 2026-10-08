@@ -32,6 +32,7 @@ import { ReportUserScreen } from './components/screens/ReportUserScreen'; // Scr
 import { AdminDashboardScreen } from './components/screens/AdminDashboardScreen'; // Screen 20
 import { SuspendedAccountScreen } from './components/screens/SuspendedAccountScreen';
 import { ProfileSetupModal } from './components/profile/ProfileSetupModal';
+import { LiveActivityTicker } from './components/common/LiveActivityTicker';
 
 function AppContent() {
   const { currentUser, userAccount, userProfile, loading } = useAuth();
@@ -132,6 +133,9 @@ function AppContent() {
           setProfileModalOpen(true);
         }}
       />
+
+      {/* Live Activity & Match Ticker (Rotating every 12-18s with fluctuating active members) */}
+      {effectiveScreen !== 'chat' && <LiveActivityTicker />}
 
       {/* Main Content Router rendering the 20 requested screens */}
       <main className="flex-1">
