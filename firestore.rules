@@ -112,7 +112,7 @@ service cloud.firestore {
 
         allow read: if isSignedIn() && (isParticipant() || isAdmin());
         allow create: if isSignedIn() && isParticipant() &&
-          incoming().senderId == request.auth.uid &&
+          (incoming().senderId == request.auth.uid || incoming().receiverId == request.auth.uid) &&
           incoming().text is string && incoming().text.size() <= 2000 &&
           get(/databases/$(database)/documents/matches/$(matchId)).data.status == 'active';
         allow update: if isSignedIn() && isParticipant();
@@ -124,7 +124,7 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() &&
-        incoming().senderId == request.auth.uid &&
+        (incoming().senderId == request.auth.uid || incoming().receiverId == request.auth.uid) &&
         incoming().receiverId is string &&
         incoming().text is string && incoming().text.size() <= 2000;
       allow update: if isSignedIn() && (

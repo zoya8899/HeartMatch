@@ -284,27 +284,41 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!activeMatch || !currentUser) return;
     const matchCopy = { ...activeMatch };
 
+    // Capture conversation history context before delay
+    const historySnapshot = messages.slice(-8).map((m) => ({
+      sender: m.senderId === currentUser.uid ? ('user' as const) : ('persona' as const),
+      text: m.text,
+    }));
+
+    // Realistic delay before persona starts typing (500-900ms)
     setTimeout(() => {
       setIsTyping(true);
 
-      setTimeout(async () => {
-        setIsTyping(false);
+      // Natural typing delay between 2000ms and 3800ms (2 to 4 seconds)
+      const typingDuration = Math.floor(Math.random() * 1600) + 2200;
 
-        let replyText = `Thanks for reaching out, ${userProfile?.name || 'friend'}! I really appreciate your message. How is your day going?`;
-        if (userMessage.toLowerCase().includes('coffee') || userMessage.toLowerCase().includes('cafe')) {
-          replyText = `I am a huge fan of specialty coffee! Do you have a favorite spot you like to frequent?`;
-        } else if (userMessage.toLowerCase().includes('travel') || userMessage.toLowerCase().includes('trip')) {
-          replyText = `Traveling is one of my greatest passions. What's the most memorable place you have visited so far?`;
-        } else if (userMessage.toLowerCase().includes('weekend') || userMessage.toLowerCase().includes('fun')) {
-          replyText = `Weekends are all about unwinding and good food. What are your plans for this weekend?`;
-        } else if (userMessage.toLowerCase().includes('hi') || userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('salam')) {
-          replyText = `Hello! It's so lovely to connect with you on HeartMatch. How has your week been?`;
+      // Start fetching Gemini API response in parallel with the typing delay
+      const aiReplyPromise = geminiService.sendPersonaChatMessage({
+        personaId: receiverId,
+        userMessage,
+        conversationHistory: historySnapshot,
+        userProfile: userProfile || {},
+      });
+
+      setTimeout(async () => {
+        let replyText = '';
+        try {
+          replyText = await aiReplyPromise;
+        } catch (e) {
+          replyText = `Thanks for your message! It is so nice connecting with you on HeartMatch. How has your day been going?`;
         }
+
+        setIsTyping(false);
 
         const replyId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         const replyCreatedAt = new Date().toISOString();
 
-        const autoMsg = {
+        const personaMsg: MessageRecord = {
           id: replyId,
           matchId: matchCopy.id,
           senderId: receiverId,
@@ -317,21 +331,35 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: replyCreatedAt,
         };
 
-        try {
-          // Write reply to top-level `messages` collection
-          await setDoc(doc(db, 'messages', replyId), autoMsg);
+        // 1. Immediately append to active chat screen so response appears instantly
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === replyId)) return prev;
+          return [...prev, personaMsg];
+        });
 
-          // Also write to subcollection and match metadata
-          await setDoc(doc(db, 'matches', matchCopy.id, 'messages', replyId), autoMsg);
-          await updateDoc(doc(db, 'matches', matchCopy.id), {
+        // 2. Persist in Firestore messages collection
+        try {
+          await setDoc(doc(db, 'messages', replyId), personaMsg);
+        } catch (err) {
+          console.warn('Could not persist persona reply to Firestore /messages:', err);
+        }
+
+        // 3. Mirror in matches subcollection and update match lastMessageText
+        try {
+          await setDoc(doc(db, 'matches', matchCopy.id, 'messages', replyId), personaMsg);
+          await setDoc(doc(db, 'matches', matchCopy.id), {
+            id: matchCopy.id,
+            user1Id: matchCopy.user1Id,
+            user2Id: matchCopy.user2Id,
+            status: 'active',
             lastMessageText: replyText,
             lastMessageTime: replyCreatedAt,
-          });
+          }, { merge: true });
         } catch (e) {
-          console.warn('Interactive reply write error:', e);
+          console.warn('Match doc update error:', e);
         }
-      }, 2000);
-    }, 1200);
+      }, typingDuration);
+    }, 600);
   };
 
   const deleteMessage = async (messageId: string) => {

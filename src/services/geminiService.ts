@@ -115,5 +115,26 @@ export const geminiService = {
         recommendations: 'No abnormal signals detected.'
       };
     }
+  },
+
+  async sendPersonaChatMessage(params: {
+    personaId: string;
+    userMessage: string;
+    conversationHistory: { sender: 'user' | 'persona'; text: string }[];
+    userProfile?: Partial<UserProfile>;
+  }): Promise<string> {
+    try {
+      const res = await fetch('/api/gemini/persona-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!res.ok) throw new Error('Failed to get persona response');
+      const data = await res.json();
+      return data.text || 'Thanks for reaching out! How is your day going?';
+    } catch (err) {
+      console.error('Error fetching persona chat:', err);
+      return 'It is so lovely to connect with you on HeartMatch! Tell me more about what you like to do?';
+    }
   }
 };

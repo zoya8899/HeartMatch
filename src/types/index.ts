@@ -78,6 +78,8 @@ export interface UserProfile {
   updatedAt?: string;
   isRealUser?: boolean;
   profileSetupCompleted?: boolean;
+  isAIPersona?: boolean;
+  personaPrompt?: string;
 }
 
 export interface DiscoveryPreferences {

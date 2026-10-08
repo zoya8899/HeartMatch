@@ -8,6 +8,7 @@ import {
   INITIAL_PROFILE_ACTIVITIES,
   ELIGIBLE_DISCOVERY_COUNTRIES,
 } from './src/services/seedData.ts';
+import { AI_PERSONAS } from './src/services/aiPersonas.ts';
 import type { UserProfile } from './src/types/index.ts';
 
 const app = express();
@@ -226,6 +227,118 @@ Provide an honest, uplifting, and objective compatibility breakdown:
       summary: "You share common relationship goals and complementary lifestyle interests.",
       highlights: ["Strong alignment on lifestyle goals", "Great conversational potential", "Shared core values"],
       advice: "Ask about their favorite travel memory to spark deep chemistry."
+    });
+  }
+});
+
+// AI Feature 4: Smart Real-Time AI Chat Engine (20 Personas: 10 Pakistani Girls + 10 UK Boys)
+app.post('/api/gemini/persona-chat', async (req: Request, res: Response) => {
+  try {
+    const {
+      personaId,
+      userMessage,
+      conversationHistory = [],
+      userProfile = {},
+    } = req.body;
+
+    // Find persona in AI_PERSONAS or fallback
+    const persona = AI_PERSONAS.find((p) => p.userId === personaId) ||
+      INITIAL_DISCOVERY_PROFILES.find((p) => p.userId === personaId);
+
+    const personaName = persona?.name || 'Match';
+    const personaAge = persona?.age || 25;
+    const personaCity = persona?.city || 'Lahore';
+    const personaCountry = persona?.country || 'Pakistan';
+    const personaProfession = persona?.profession || 'Professional';
+    const isPakistaniFemale = personaCountry.toLowerCase() === 'pakistan' && (persona?.gender === 'woman' || !persona?.gender);
+    const isUKMale = personaCountry.toLowerCase().includes('united kingdom') || personaCountry.toLowerCase() === 'uk';
+
+    const senderName = userProfile?.name || 'friend';
+
+    let personaSystemPrompt = '';
+
+    if (isPakistaniFemale) {
+      personaSystemPrompt = `You are ${personaName}, a ${personaAge}-year-old ${personaProfession} living in ${personaCity}, Pakistan.
+Your personality: Warm, respectful, friendly, well-educated, culturally authentic Pakistani woman chatting on HeartMatch (a respectful dating & matrimony platform).
+Background & bio: ${persona?.bio || 'Lover of chai, genuine conversations, and art.'}
+Interests: ${persona?.interests?.join(', ') || 'Reading, travel, food'}.
+
+Cultural & Language Instructions:
+- Reply in a natural, friendly blend of English and polite Urdu/Roman Urdu words (e.g. 'Aap kaise hain?', 'Bilkul', 'Mashallah', 'Haan ji', 'Zabardast', 'Bohot khoob', 'Shukriya', 'Acha batayein', 'Kaisa raha aapka din?').
+- Be polite, courteous, respectful, and charming.
+- Do NOT talk like an AI or virtual assistant. Never say 'How can I assist you today' or 'As an AI'.
+- Maintain natural context of previous messages.
+- Keep the response concise, natural, and engaging (1 to 3 sentences maximum), and ask a warm follow-up question.`;
+    } else if (isUKMale) {
+      personaSystemPrompt = `You are ${personaName}, a ${personaAge}-year-old ${personaProfession} living in ${personaCity}, United Kingdom.
+Your personality: Casual, charming, witty, down-to-earth British guy chatting on HeartMatch.
+Background & bio: ${persona?.bio || 'Coffee lover, enjoy weekend banter, live music, and good times.'}
+Interests: ${persona?.interests?.join(', ') || 'Music, sports, travel, good food'}.
+
+Cultural & Language Instructions:
+- Reply in natural, casual British English. Use authentic UK expressions naturally (e.g. 'Cheers!', 'Proper good', 'Brilliant', 'I reckon', 'Fair play', 'Sound', 'Fancy', 'How is your week shaping up?', 'Spot on').
+- Be engaging, conversational, humorous, and respectful.
+- Do NOT talk like an AI or virtual assistant. Never say 'How can I assist you today' or 'As an AI'.
+- Maintain natural context of previous messages.
+- Keep the response concise, punchy, and engaging (1 to 3 sentences maximum), and ask an engaging question back.`;
+    } else {
+      personaSystemPrompt = `You are ${personaName}, a ${personaAge}-year-old ${personaProfession} living in ${personaCity}, ${personaCountry}.
+Bio: ${persona?.bio || ''}
+Interests: ${persona?.interests?.join(', ') || ''}.
+Speak warmly and authentically as yourself on HeartMatch. Keep response concise (1-3 sentences) and conversational.`;
+    }
+
+    if (!geminiApiKey) {
+      let fallbackText = '';
+      const lowerMsg = (userMessage || '').toLowerCase();
+      if (isPakistaniFemale) {
+        if (lowerMsg.includes('salam') || lowerMsg.includes('hi') || lowerMsg.includes('hello')) {
+          fallbackText = `Walaikum Assalam! Bohot acha laga aapka message dekh kar. Aap kaise hain, aur aapka din kaisa guzar raha hai?`;
+        } else if (lowerMsg.includes('chai') || lowerMsg.includes('coffee') || lowerMsg.includes('food')) {
+          fallbackText = `Chai ke baghair to din shuru hi nahi hota! Aapko Karak chai zyada pasand hai ya coffee?`;
+        } else if (lowerMsg.includes('where') || lowerMsg.includes('city') || lowerMsg.includes('kahan')) {
+          fallbackText = `Main ${personaCity} mein rehti hoon. Aap kahan se hain?`;
+        } else {
+          fallbackText = `Haan bilkul! Yeh sun kar bohot acha laga. Aap apne baare mein kuch aur batayein na?`;
+        }
+      } else if (isUKMale) {
+        if (lowerMsg.includes('hi') || lowerMsg.includes('hello') || lowerMsg.includes('hey')) {
+          fallbackText = `Hey there! Brilliant to hear from you. How is your week treating you so far?`;
+        } else if (lowerMsg.includes('weekend') || lowerMsg.includes('plan') || lowerMsg.includes('sunday')) {
+          fallbackText = `Proper excited for the weekend! Usually out for a Sunday roast or catching some live music. What about yourself?`;
+        } else if (lowerMsg.includes('coffee') || lowerMsg.includes('beer') || lowerMsg.includes('drink')) {
+          fallbackText = `I reckon a good flat white can cure almost anything! What's your go-to spot?`;
+        } else {
+          fallbackText = `Spot on! Totally agree with you there. What have you been up to today then?`;
+        }
+      } else {
+        fallbackText = `Thanks for reaching out! It is so nice to connect with you. How has your day been going?`;
+      }
+      return res.json({ text: fallbackText });
+    }
+
+    // Format chat history context for Gemini
+    const historyText = Array.isArray(conversationHistory) && conversationHistory.length > 0
+      ? conversationHistory.slice(-6).map((m: any) => `${m.sender === 'user' ? (senderName || 'User') : personaName}: ${m.text}`).join('\n')
+      : '';
+
+    const fullPrompt = `${personaSystemPrompt}
+
+Conversation so far:
+${historyText ? historyText + '\n' : ''}${senderName}: ${userMessage}
+${personaName}:`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: fullPrompt,
+    });
+
+    const reply = response.text ? response.text.trim() : '';
+    res.json({ text: reply || `Thanks for the message! How is your day going?` });
+  } catch (error) {
+    console.error('Error generating persona chat reply:', error);
+    res.json({
+      text: `It is so lovely to connect with you! Tell me more about what you enjoy doing in your free time?`
     });
   }
 });

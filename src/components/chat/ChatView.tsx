@@ -25,6 +25,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useChat } from '../../contexts/ChatContext';
 import { MatchRecord, UserProfile, AICompatibilityResponse } from '../../types';
 import { geminiService } from '../../services/geminiService';
+import { isAIPersonaUser } from '../../services/aiPersonas';
 import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
 
 interface ChatViewProps {
@@ -121,7 +122,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setRecordSeconds(0);
   };
 
+  const isPersona = otherProfile.isAIPersona || isAIPersonaUser(otherProfile.userId);
+
   const isOtherInternational =
+    !isPersona &&
     otherProfile.country &&
     otherProfile.country.toLowerCase() !== 'pakistan';
 
@@ -621,8 +625,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           />
 
           <button
-            type="button"
-            onClick={() => handleSend()}
+            type="submit"
             disabled={sendingMessage || (!inputVal.trim() && !imageUrlInput.trim())}
             className="p-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors disabled:opacity-40 cursor-pointer"
             title="Send message"

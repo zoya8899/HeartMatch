@@ -148,16 +148,16 @@ function AppContent() {
         {effectiveScreen === 'age_verification' && <AgeVerificationScreen onNavigate={navigateTo} />}
 
         {/* Screen 5: Create Profile */}
-        {currentScreen === 'create_profile' && <CreateProfileScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'create_profile' && <CreateProfileScreen onNavigate={navigateTo} />}
 
         {/* Screen 6: Upload Photos */}
-        {currentScreen === 'upload_photos' && <UploadPhotosScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'upload_photos' && <UploadPhotosScreen onNavigate={navigateTo} />}
 
         {/* Screen 7: Dating Preferences */}
-        {currentScreen === 'dating_preferences' && <DatingPreferencesScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'dating_preferences' && <DatingPreferencesScreen onNavigate={navigateTo} />}
 
         {/* Screen 8: Discover / Swipe */}
-        {currentScreen === 'discover' && (
+        {effectiveScreen === 'discover' && (
           <DiscoverScreen
             onNavigate={navigateTo}
             onOpenProfileDetails={(profile) => {
@@ -168,7 +168,7 @@ function AppContent() {
         )}
 
         {/* Screen 9: Profile Details */}
-        {currentScreen === 'profile_details' && (
+        {effectiveScreen === 'profile_details' && (
           <ProfileDetailsScreen
             profile={selectedProfile}
             onBack={() => navigateTo('discover')}
@@ -181,7 +181,7 @@ function AppContent() {
         )}
 
         {/* Screen 10: Likes */}
-        {currentScreen === 'likes' && (
+        {effectiveScreen === 'likes' && (
           <LikesScreen
             onNavigate={navigateTo}
             onOpenProfile={(profile) => {
@@ -192,10 +192,10 @@ function AppContent() {
         )}
 
         {/* Screen 11: Matches */}
-        {currentScreen === 'matches' && <MatchesScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'matches' && <MatchesScreen onNavigate={navigateTo} />}
 
         {/* Screen 12: Chat */}
-        {currentScreen === 'chat' && (
+        {effectiveScreen === 'chat' && (
           <ChatScreen
             onNavigate={navigateTo}
             onOpenSafetyModal={handleOpenSafetyModal}
@@ -203,33 +203,33 @@ function AppContent() {
         )}
 
         {/* Screen 13: Premium Plans */}
-        {currentScreen === 'premium_plans' && <PremiumPlansScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'premium_plans' && <PremiumPlansScreen onNavigate={navigateTo} />}
 
         {/* Screen 14: Payment */}
-        {currentScreen === 'payment' && (
+        {effectiveScreen === 'payment' && (
           <PaymentScreen planId={selectedPlanId} onNavigate={navigateTo} />
         )}
 
         {/* Screen 15: Subscription Management */}
-        {currentScreen === 'subscription_management' && (
+        {effectiveScreen === 'subscription_management' && (
           <SubscriptionManagementScreen onNavigate={navigateTo} />
         )}
 
         {/* Screen 16: Settings */}
-        {currentScreen === 'settings' && <SettingsScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'settings' && <SettingsScreen onNavigate={navigateTo} />}
 
         {/* Screen 17: Privacy Settings */}
-        {currentScreen === 'privacy_settings' && (
+        {effectiveScreen === 'privacy_settings' && (
           <PrivacySettingsScreen onNavigate={navigateTo} />
         )}
 
         {/* Screen 18: Safety Center */}
-        {currentScreen === 'safety_center' && (
+        {effectiveScreen === 'safety_center' && (
           <SafetyCenterScreen onNavigate={navigateTo} />
         )}
 
         {/* Screen 19: Report User */}
-        {currentScreen === 'report_user' && (
+        {effectiveScreen === 'report_user' && (
           <ReportUserScreen
             targetUserId={reportTarget.id}
             targetUserName={reportTarget.name}
@@ -238,7 +238,7 @@ function AppContent() {
         )}
 
         {/* Screen 20: Admin Dashboard */}
-        {currentScreen === 'admin' && <AdminDashboardScreen onNavigate={navigateTo} />}
+        {effectiveScreen === 'admin' && <AdminDashboardScreen onNavigate={navigateTo} />}
       </main>
 
       {/* Global Safety Modal */}

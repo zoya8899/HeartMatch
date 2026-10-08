@@ -26,6 +26,7 @@ import { useMatch } from '../../contexts/MatchContext';
 import { useChat } from '../../contexts/ChatContext';
 import { UserProfile, AICompatibilityResponse } from '../../types';
 import { geminiService } from '../../services/geminiService';
+import { isAIPersonaUser } from '../../services/aiPersonas';
 import { InternationalUpgradeModal } from '../modals/InternationalUpgradeModal';
 
 interface ProfileDetailsScreenProps {
@@ -53,7 +54,8 @@ export const ProfileDetailsScreen: React.FC<ProfileDetailsScreenProps> = ({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   const handleStartDirectChat = async () => {
-    if (isPakistanUser && !isPremium && profile.country && profile.country.toLowerCase() !== 'pakistan') {
+    const isPersona = profile.isAIPersona || isAIPersonaUser(profile.userId);
+    if (!isPersona && isPakistanUser && !isPremium && profile.country && profile.country.toLowerCase() !== 'pakistan') {
       setUpgradeModalOpen(true);
       return;
     }
